@@ -1,0 +1,21 @@
+# Company board tokens. Greenhouse: boards.greenhouse.io/<token>, Lever: jobs.lever.co/<token>
+# Scope is US jobs; boards chosen for US-heavy postings across industries.
+greenhouse = [
+    # tech / AI / infra
+    "airbnb", "databricks", "figma", "discord", "anthropic", "scaleai", "datadog",
+    "mongodb", "elastic", "okta", "gitlab", "twilio", "vercel", "samsara", "asana",
+    "dropbox", "airtable",
+    # fintech / trading
+    "stripe", "robinhood", "brex", "coinbase", "affirm", "chime", "sofi", "carta",
+    "betterment", "point72", "janestreet", "imc", "aqr",
+    # healthcare
+    "oscar", "zocdoc", "komodohealth", "flatironhealth",
+    # consumer / marketplace / retail
+    "instacart", "lyft", "reddit", "pinterest", "toast", "faire", "duolingo",
+    "sweetgreen", "peloton", "glossier", "squarespace", "nextdoor", "fanduel",
+    # gaming / media
+    "roblox", "riotgames", "epicgames", "twitch", "axios",
+    # hardware / auto / aerospace
+    "lucidmotors", "relativity",
+]
+lever = ["spotify", "palantir", "veeva", "zoox", "shieldai"]

@@ -19,3 +19,6 @@ logs/
 # Lambda build artifacts
 *.zip
 package/
+
+# local raw landing (S3 replaces this later)
+data/
