@@ -1,0 +1,24 @@
+[project]
+name = "datatrace"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.43.96",
+    "dbt-postgres>=1.11.0",
+    "psycopg[binary]>=3.3.5",
+    "python-dotenv>=1.2.3",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+]
+
+[project.scripts]
+datatrace-ingest = "datatrace.ingest:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

@@ -4,4 +4,4 @@ A job market analytics pipeline that pulls postings from public job board APIs, 
 
 Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt → Tableau Public
 
-Sources: Greenhouse, Lever, RemoteOK, Arbeitnow public APIs.
+Sources: Greenhouse, Lever, RemoteOK public APIs. Scope: US postings only (filtered in dbt staging).
