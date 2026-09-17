@@ -1,0 +1,21 @@
+CLAUDE.md
+.claude/
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+
+.DS_Store
+.Rhistory
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Lambda build artifacts
+*.zip
+package/
