@@ -12,6 +12,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "moto[s3]>=5.2.3",
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]
@@ -22,3 +23,6 @@ datatrace-ingest = "datatrace.ingest:main"
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
