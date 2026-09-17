@@ -1,15 +1,17 @@
 import argparse
 import logging
+import os
 import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
+from botocore.exceptions import BotoCoreError, ClientError
 
 from datatrace.http import make_session
 from datatrace.sources import greenhouse, lever, remoteok
-from datatrace.writer import raw_path, write_jsonl
+from datatrace.writer import make_sink, manifest_key, raw_key
 
 log = logging.getLogger("datatrace.ingest")
 
@@ -25,41 +27,49 @@ def build_jobs(boards_config: dict):
         yield source, None, fetch
 
 
-def run(boards_config: dict, out_dir: Path, sources: set[str] | None = None) -> dict:
+def run(boards_config: dict, sink, sources: set[str] | None = None) -> dict:
     session = make_session()
     run_ts = datetime.now(UTC)
-    summary = {"ok": {}, "failed": {}}
+    summary = {"run_ts": run_ts.isoformat(), "ok": {}, "failed": {}, "objects": []}
 
     for source, board, fetch in build_jobs(boards_config):
         if sources and source not in sources:
             continue
-        key = f"{source}/{board}" if board else source
+        name = f"{source}/{board}" if board else source
         meta = {
             "source": source,
             "board": board,
             "ingested_at": run_ts.isoformat(),
         }
-        path = raw_path(out_dir, source, run_ts, board)
         try:
-            count = write_jsonl(path, fetch(session), meta)
+            location, count = sink.write_records(
+                raw_key(source, run_ts, board), fetch(session), meta
+            )
         except (requests.RequestException, KeyError, ValueError) as exc:
             # One dead board (renamed token, API outage) should not sink the whole run
-            log.error("failed %s: %s", key, exc)
-            path.with_suffix(".jsonl.tmp").unlink(missing_ok=True)
-            summary["failed"][key] = str(exc)
+            log.error("failed %s: %s", name, exc)
+            summary["failed"][name] = str(exc)
             continue
-        log.info("wrote %d records for %s -> %s", count, key, path)
-        summary["ok"][key] = count
+        log.info("wrote %d records for %s -> %s", count, name, location)
+        summary["ok"][name] = count
+        summary["objects"].append(location)
 
+    # Written last: its presence marks the run as finished for the downstream loader
+    location = sink.write_json(manifest_key(run_ts), summary)
+    log.info("manifest -> %s", location)
     return summary
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Pull raw job postings to local storage"
+        description="Pull raw job postings to local disk or S3"
     )
     parser.add_argument("--config", type=Path, default=Path("config/boards.toml"))
-    parser.add_argument("--out", type=Path, default=Path("data/raw"))
+    parser.add_argument(
+        "--out",
+        default=os.environ.get("DATATRACE_OUT", "data/raw"),
+        help="local directory or s3://bucket/prefix",
+    )
     parser.add_argument(
         "--source",
         action="append",
@@ -74,7 +84,13 @@ def main(argv: list[str] | None = None) -> int:
     with args.config.open("rb") as f:
         boards_config = tomllib.load(f)
 
-    summary = run(boards_config, args.out, set(args.source) if args.source else None)
+    sink = make_sink(args.out)
+    try:
+        summary = run(boards_config, sink, set(args.source) if args.source else None)
+    except (BotoCoreError, ClientError) as exc:
+        # S3 auth/bucket errors hit every board identically, so fail fast instead of per-board
+        log.error("storage error: %s", exc)
+        return 2
     total = sum(summary["ok"].values())
     log.info(
         "done: %d records, %d ok, %d failed",
