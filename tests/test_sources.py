@@ -49,17 +49,25 @@ def test_smartrecruiters_pages_then_fetches_details(monkeypatch):
     assert details[0]["url"].endswith("/companies/Acme/postings/0")
 
 
-def test_rippling_keeps_list_locations(monkeypatch):
-    item = {"id": "j1", "locations": [{"countryCode": "US"}]}
-    monkeypatch.setattr(
-        rippling, "get_json", lambda s, url, params: {"items": [item], "totalPages": 1}
-    )
-    monkeypatch.setattr(
-        rippling, "get_many", lambda s, urls: [{"uuid": "j1", "name": "Eng"}]
-    )
-    assert list(rippling.fetch(None, "acme")) == [
-        {"uuid": "j1", "name": "Eng", "locations": [{"countryCode": "US"}]}
+def test_rippling_merges_per_location_items(monkeypatch):
+    items = [
+        {"id": "j1", "locations": [{"name": "NYC"}]},
+        {"id": "j1", "locations": [{"name": "SF"}]},
     ]
+    monkeypatch.setattr(
+        rippling, "get_json", lambda s, url, params: {"items": items, "totalPages": 1}
+    )
+    fetched = []
+
+    def fake_many(s, urls):
+        fetched.extend(urls)
+        return [{"uuid": "j1", "name": "Eng"}]
+
+    monkeypatch.setattr(rippling, "get_many", fake_many)
+    assert list(rippling.fetch(None, "acme")) == [
+        {"uuid": "j1", "name": "Eng", "locations": [{"name": "NYC"}, {"name": "SF"}]}
+    ]
+    assert len(fetched) == 1
 
 
 class FakeSession:

@@ -15,8 +15,12 @@ def fetch(session, board: str) -> Iterator[dict]:
         page_no += 1
         if page_no >= page["totalPages"]:
             break
-    details = get_many(session, [f"{url}/{item['id']}" for item in items])
-    for item, detail in zip(items, details):
+    # The list repeats a job once per location, so merge those before fetching details
+    locations: dict[str, list] = {}
+    for item in items:
+        locations.setdefault(item["id"], []).extend(item["locations"])
+    details = get_many(session, [f"{url}/{job_id}" for job_id in locations])
+    for job_id, detail in zip(locations, details):
         if detail is not None:
             # Only the list carries structured locations with country codes
-            yield {**detail, "locations": item["locations"]}
+            yield {**detail, "locations": locations[job_id]}

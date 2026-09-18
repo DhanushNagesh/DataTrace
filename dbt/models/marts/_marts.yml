@@ -34,6 +34,12 @@ models:
           somewhere between last_seen_at and the next run, so this undercounts by up to one run interval.
       - name: is_remote_anywhere
         description: Remote with no region stated. Counted as US-accessible, though some of these may quietly exclude US hires.
+      - name: salary_interval
+        description: Pay period normalised across sources to year, month, week, day or hour.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [year, month, week, day, hour]
 
   - name: dim_companies
     description: One row per hiring company, keyed on the normalized company name.
