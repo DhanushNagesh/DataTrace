@@ -47,3 +47,20 @@ retries, using the `datatrace-scheduler` role, which can only invoke this functi
 topic: the run errored or timed out (`datatrace-ingest-errors`), no run in 24h
 (`datatrace-ingest-missed`), or any board failed (`datatrace-ingest-source-failures`,
 from a log metric filter). The run manifest says which boards failed.
+
+## Local warehouse
+
+dbt development runs against Postgres 17 in Docker, not RDS, so iterating on
+models costs nothing. RDS only comes up once the models work.
+
+    docker compose up -d
+    cp .env.example .env
+    uv run datatrace-load --src data/raw
+    uv run datatrace-load --src s3://datatrace-raw-264350941264-us-east-2/raw
+
+`datatrace-load` finds run manifests that have not been loaded yet and copies
+each run's records into `raw.job_postings` (one row per posting, payload as
+`jsonb`) in a single transaction, then records the manifest in `raw.loaded_runs`.
+Rerunning is a no-op, and a run that fails partway leaves nothing behind.
+`uv run pytest` uses a separate `datatrace_test` database and skips the loader
+tests when Postgres is not running.
