@@ -88,9 +88,12 @@ pointing at the Docker Postgres and a `prod` target (RDS) that reads `DBT_HOST`,
   run, all countries, with an `is_us` flag.
 - `staging.stg_job_postings`: the union of those, filtered to US-accessible postings:
   a US location, or remote with no region stated (`is_remote_anywhere`). This is where the US filter happens.
-- `marts.postings` (table): one row per US-accessible posting with its latest attributes,
-  `first_seen_at`/`last_seen_at`, and `is_active`, meaning it was seen in the latest run that
-  returned its board, so a board outage doesn't mark its postings closed.
+- `marts.fct_job_postings` (table): one row per US-accessible posting with its latest attributes,
+  `first_seen_at`/`last_seen_at`, `days_listed`, and `is_active`, meaning it was seen in the latest
+  run that returned its board, so a board outage doesn't mark its postings closed. `is_active` is
+  null for RemoteOK, whose feed is a rolling window of recent jobs rather than a list of open ones.
+- `marts.dim_companies` (table): one row per company, joined on `company_key` (md5 of the
+  normalized name), so the same company across sources is one row.
 
 US classification: Lever has a country code. Greenhouse and RemoteOK only have
 free text, so they go through the `is_us_location` macro (regex over country names,
