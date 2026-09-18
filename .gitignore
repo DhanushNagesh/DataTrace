@@ -22,3 +22,7 @@ package/
 
 # local raw landing (S3 replaces this later)
 data/
+
+# Lambda build
+build/
+dist/
