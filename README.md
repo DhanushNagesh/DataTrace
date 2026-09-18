@@ -6,6 +6,15 @@ Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt �
 
 Sources: Greenhouse, Lever, RemoteOK public APIs. Scope: US postings only (filtered in dbt staging).
 
+## Local setup
+
+This repo lives in `~/Documents`, which iCloud syncs. iCloud sets the macOS `hidden`
+flag on every dot-named file it syncs, and Python 3.13+ skips hidden `.pth` files, so a
+normal `.venv` stops importing `datatrace` at random. The venv lives in `.venv.nosync`
+(iCloud does not sync `*.nosync`), with a `.venv` symlink so uv and editors find it:
+
+    uv venv .venv.nosync && ln -s .venv.nosync .venv && uv sync
+
 ## AWS setup
 
 The account is on the AWS (new) free plan, where work happens in a project
