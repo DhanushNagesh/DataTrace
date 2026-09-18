@@ -4,7 +4,14 @@ A job market analytics pipeline that pulls postings from public job board APIs, 
 
 Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt → Tableau Public
 
-Sources: Greenhouse, Lever, RemoteOK public APIs. Scope: US postings only (filtered in dbt staging).
+Sources: public job board APIs from Greenhouse, Lever, Ashby, SmartRecruiters and Rippling (company
+boards listed in `config/boards.toml`), plus the RemoteOK feed. Scope: US-accessible postings,
+filtered in dbt staging.
+
+SmartRecruiters and Rippling list endpoints leave out the job description, so each posting needs
+its own detail request. `http.get_many` runs those 8 at a time, and a posting that 404s between
+the list and detail calls is skipped. Rippling's list repeats a job once per location; the
+source merges those before fetching details.
 
 ## Local setup
 
@@ -48,7 +55,7 @@ objects under `raw/` and write its own log group. Deploy a new build with:
 
     aws lambda update-function-code --function-name datatrace-ingest --zip-file fileb://dist/ingest.zip
 
-A full run takes about 45s and peaks under 200 MB. EventBridge Scheduler
+A full run takes about 3.5 minutes, most of it the ~2,000 SmartRecruiters detail requests. EventBridge Scheduler
 (`datatrace-ingest-daily`) invokes it at 06:00 America/Los_Angeles with no
 retries, using the `datatrace-scheduler` role, which can only invoke this function.
 
@@ -95,13 +102,15 @@ pointing at the Docker Postgres and a `prod` target (RDS) that reads `DBT_HOST`,
 - `marts.dim_companies` (table): one row per company, joined on `company_key` (md5 of the
   normalized name), so the same company across sources is one row.
 
-US classification: Lever has a country code. Greenhouse and RemoteOK only have
-free text, so they go through the `is_us_location` macro (regex over country names,
+US classification: Lever, Ashby, SmartRecruiters and Rippling carry country fields. Greenhouse
+and RemoteOK only have free text, so they go through the `is_us_location` macro (regex over country names,
 state names/codes and major cities). `seeds/us_location_cases.csv` holds
 hand-labelled locations, and `tests/assert_us_location_cases.sql` fails if the macro
 gets any of them wrong. A Greenhouse posting whose location is just "Remote" or "N/A"
 falls back to its `offices` list. A bare "Remote", "Worldwide", or blank RemoteOK location
 counts as remote-anywhere, which is treated as US-accessible.
 
-Lever's API has no company name; `seeds/lever_companies.csv` maps board to display
-name, and a warn-level test flags Lever boards missing from it.
+Lever and Ashby have no company name in their APIs; `seeds/board_companies.csv` maps
+source and board to a display name, and a warn-level test flags boards missing from it.
+Salary periods are normalised to year/month/week/day/hour by the `pay_interval` macro.
+Rippling lists several tiered pay ranges per posting; staging keeps the first USD range.
