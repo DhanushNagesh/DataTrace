@@ -30,8 +30,9 @@ select
     null::text as department,
     null::text as employment_type,
     true as is_remote,
-    -- Blank or "Remote" is worldwide-or-unknown, not US, so most RemoteOK rows drop out here
     {{ is_us_location('location') }} as is_us,
+    -- RemoteOK is a remote-only board, so a blank location means unrestricted, same as "Worldwide"
+    location is null or {{ is_generic_remote('location') }} as is_remote_anywhere,
     salary_min,
     salary_max,
     case when salary_min is not null or salary_max is not null then 'USD' end as salary_currency,

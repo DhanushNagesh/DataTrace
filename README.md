@@ -77,8 +77,9 @@ pointing at the Docker Postgres and a `prod` target (RDS) that reads `DBT_HOST`,
 
 - `staging.stg_<source>__postings` (views): one typed row per posting per ingest
   run, all countries, with an `is_us` flag.
-- `staging.stg_job_postings`: the US-only union of those. This is where the US filter happens.
-- `marts.postings` (table): one row per US posting with its latest attributes,
+- `staging.stg_job_postings`: the union of those, filtered to US-accessible postings:
+  a US location, or remote with no region stated (`is_remote_anywhere`). This is where the US filter happens.
+- `marts.postings` (table): one row per US-accessible posting with its latest attributes,
   `first_seen_at`/`last_seen_at`, and `is_active`, meaning it was seen in the latest run that
   returned its board, so a board outage doesn't mark its postings closed.
 
@@ -86,4 +87,9 @@ US classification: Lever has a country code. Greenhouse and RemoteOK only have
 free text, so they go through the `is_us_location` macro (regex over country names,
 state names/codes and major cities). `seeds/us_location_cases.csv` holds
 hand-labelled locations, and `tests/assert_us_location_cases.sql` fails if the macro
-gets any of them wrong. Location-less "Remote" postings count as not US.
+gets any of them wrong. A Greenhouse posting whose location is just "Remote" or "N/A"
+falls back to its `offices` list. A bare "Remote", "Worldwide", or blank RemoteOK location
+counts as remote-anywhere, which is treated as US-accessible.
+
+Lever's API has no company name; `seeds/lever_companies.csv` maps board to display
+name, and a warn-level test flags Lever boards missing from it.

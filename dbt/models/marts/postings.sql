@@ -1,4 +1,4 @@
--- One row per US posting: latest attributes plus when the pipeline first and last saw it
+-- One row per US-accessible posting: latest attributes plus when the pipeline first and last saw it
 with observations as (
     select * from {{ ref('stg_job_postings') }}
 ),
@@ -36,6 +36,8 @@ select
     latest.department,
     latest.employment_type,
     latest.is_remote,
+    latest.is_us,
+    latest.is_remote_anywhere,
     latest.salary_min,
     latest.salary_max,
     latest.salary_currency,

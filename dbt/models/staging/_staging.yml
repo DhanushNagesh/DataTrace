@@ -18,6 +18,15 @@ models:
       - unique:
           column_name: "posting_key || '@' || observed_at"
     columns:
+      - name: board
+        description: Boards missing from seeds/lever_companies.csv show a slug-derived company name.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('lever_companies')
+                field: board
+              config:
+                severity: warn
       - name: posting_key
         data_tests: [not_null]
       - name: title
@@ -33,7 +42,7 @@ models:
         data_tests: [not_null]
 
   - name: stg_job_postings
-    description: US-only observations from every source, one row per posting per ingest run.
+    description: US-accessible observations (US location or unrestricted remote) from every source, one row per posting per ingest run.
     columns:
       - name: source
         data_tests:

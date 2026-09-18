@@ -28,3 +28,8 @@ Join us in Berlin,false
 ,false
 "Toronto, ON, CA",false
 "Toronto, ON, CA; Austin, TX",true
+"Berlin, DE",false
+"Buenos Aires, AR",false
+"Bentonville, AR",true
+"Wilmington, Delaware",true
+Greater Orlando,true

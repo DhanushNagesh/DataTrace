@@ -10,6 +10,10 @@ parsed as (
         payload->>'company_name' as company,
         payload->>'title' as title,
         payload->'location'->>'name' as location,
+        (
+            select string_agg(o->>'name', ' | ')
+            from jsonb_array_elements(payload->'offices') o
+        ) as offices,
         payload->'departments'->0->>'name' as department,
         payload->>'employment' as employment_type,
         jsonb_path_query_first(
@@ -34,7 +38,14 @@ select
     department,
     employment_type,
     coalesce(workplace_type ilike 'remote%' or location ~* '\yremote\y', false) as is_remote,
-    {{ is_us_location('location') }} as is_us,
+    -- Offices only break ties when the location says nothing ("Remote", "N/A"); otherwise they are too
+    -- noisy, since postings in Spain or Ireland often list a company-wide "United States" office
+    {{ is_us_location('location') }}
+        or (
+            ({{ is_generic_remote('location') }} or coalesce(location, '') ~* '^\s*(n/?a)?\s*$')
+            and {{ is_us_location('offices') }}
+        ) as is_us,
+    {{ is_generic_remote('location') }} and not {{ is_us_location('offices') }} as is_remote_anywhere,
     null::numeric as salary_min,
     null::numeric as salary_max,
     null::text as salary_currency,

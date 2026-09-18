@@ -28,12 +28,12 @@ parsed as (
 )
 
 select
-    'lever:' || board || ':' || posting_id as posting_key,
+    'lever:' || parsed.board || ':' || posting_id as posting_key,
     'lever' as source,
-    board,
+    parsed.board,
     posting_id,
-    -- Lever postings carry no company name; the board token is the company slug
-    initcap(board) as company,
+    -- Lever postings carry no company name; fall back to the slug for boards missing from the seed
+    coalesce(companies.company, initcap(parsed.board)) as company,
     title,
     location,
     department,
@@ -41,6 +41,7 @@ select
     workplace_type = 'remote' as is_remote,
     -- country is the primary location only, so also check the full location list
     coalesce(country_code = 'US', false) or {{ is_us_location('all_locations') }} as is_us,
+    country_code is null and {{ is_generic_remote('location') }} as is_remote_anywhere,
     salary_min,
     salary_max,
     salary_currency,
@@ -51,3 +52,4 @@ select
     null::timestamptz as source_updated_at,
     observed_at
 from parsed
+left join {{ ref('lever_companies') }} as companies on companies.board = parsed.board
