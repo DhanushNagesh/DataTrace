@@ -19,11 +19,11 @@ models:
           column_name: "posting_key || '@' || observed_at"
     columns:
       - name: board
-        description: Boards missing from seeds/lever_companies.csv show a slug-derived company name.
+        description: Boards missing from seeds/board_companies.csv show a slug-derived company name.
         data_tests:
           - relationships:
               arguments:
-                to: ref('lever_companies')
+                to: ref('board_companies')
                 field: board
               config:
                 severity: warn
@@ -41,6 +41,42 @@ models:
       - name: posting_key
         data_tests: [not_null]
 
+  - name: stg_ashby__postings
+    description: Typed Ashby observations, all countries. Unlisted postings are dropped.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: posting_key
+        data_tests: [not_null]
+      - name: board
+        description: Boards missing from seeds/board_companies.csv show a slug-derived company name.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('board_companies')
+                field: board
+              config:
+                severity: warn
+
+  - name: stg_smartrecruiters__postings
+    description: Typed SmartRecruiters observations (detail payloads), all countries.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: posting_key
+        data_tests: [not_null]
+
+  - name: stg_rippling__postings
+    description: Typed Rippling observations, all countries. Salary is the first USD pay range listed.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: posting_key
+        data_tests: [not_null]
+
   - name: stg_job_postings
     description: US-accessible observations (US location or unrestricted remote) from every source, one row per posting per ingest run.
     columns:
@@ -48,7 +84,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: [greenhouse, lever, remoteok]
+                values: [greenhouse, lever, remoteok, ashby, smartrecruiters, rippling]
 
   - name: stg_board_runs
     description: Which ingest runs saw each board.

@@ -10,12 +10,25 @@ import requests
 from botocore.exceptions import BotoCoreError, ClientError
 
 from datatrace.http import make_session
-from datatrace.sources import greenhouse, lever, remoteok
+from datatrace.sources import (
+    ashby,
+    greenhouse,
+    lever,
+    remoteok,
+    rippling,
+    smartrecruiters,
+)
 from datatrace.writer import make_sink, manifest_key, raw_key
 
 log = logging.getLogger("datatrace.ingest")
 
-BOARD_SOURCES = {"greenhouse": greenhouse.fetch, "lever": lever.fetch}
+BOARD_SOURCES = {
+    "greenhouse": greenhouse.fetch,
+    "lever": lever.fetch,
+    "ashby": ashby.fetch,
+    "smartrecruiters": smartrecruiters.fetch,
+    "rippling": rippling.fetch,
+}
 FEED_SOURCES = {"remoteok": remoteok.fetch}
 
 

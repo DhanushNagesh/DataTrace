@@ -36,7 +36,7 @@ select
     salary_min,
     salary_max,
     case when salary_min is not null or salary_max is not null then 'USD' end as salary_currency,
-    case when salary_min is not null or salary_max is not null then 'per-year-salary' end as salary_interval,
+    case when salary_min is not null or salary_max is not null then 'year' end as salary_interval,
     url,
     description_html,
     published_at,

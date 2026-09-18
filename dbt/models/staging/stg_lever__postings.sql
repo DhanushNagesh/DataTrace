@@ -45,11 +45,12 @@ select
     salary_min,
     salary_max,
     salary_currency,
-    salary_interval,
+    {{ pay_interval('salary_interval') }} as salary_interval,
     url,
     description_html,
     published_at,
     null::timestamptz as source_updated_at,
     observed_at
 from parsed
-left join {{ ref('lever_companies') }} as companies on companies.board = parsed.board
+left join {{ ref('board_companies') }} as companies
+    on companies.source = 'lever' and companies.board = parsed.board

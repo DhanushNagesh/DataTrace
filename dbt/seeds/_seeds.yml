@@ -8,8 +8,8 @@ seeds:
         location: text
         expected_is_us: boolean
 
-  - name: lever_companies
-    description: Display names for Lever boards, which carry no company name in the API. Add a row when adding a Lever board.
-    columns:
-      - name: board
-        data_tests: [unique, not_null]
+  - name: board_companies
+    description: Display names for boards whose API carries no company name (Lever, Ashby). Add a row when adding such a board.
+    data_tests:
+      - unique:
+          column_name: "source || ':' || board"
