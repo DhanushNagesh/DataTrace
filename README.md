@@ -8,12 +8,12 @@ Sources: Greenhouse, Lever, RemoteOK public APIs. Scope: US postings only (filte
 
 ## Local setup
 
-This repo lives in `~/Documents`, which iCloud syncs. iCloud sets the macOS `hidden`
-flag on every dot-named file it syncs, and Python 3.13+ skips hidden `.pth` files, so a
-normal `.venv` stops importing `datatrace` at random. The venv lives in `.venv.nosync`
-(iCloud does not sync `*.nosync`), with a `.venv` symlink so uv and editors find it:
+Keep the repo out of iCloud-synced folders (`~/Documents`, `~/Desktop`). iCloud sets the
+macOS `hidden` flag on dot-named files it syncs, and Python 3.13+ skips hidden `.pth`
+files, so the venv's editable install silently stops importing `datatrace`. It also
+syncs `.git`, which risks corrupting the repo. This repo lives in `~/code/DataTrace`.
 
-    uv venv .venv.nosync && ln -s .venv.nosync .venv && uv sync
+    uv sync
 
 ## AWS setup
 
