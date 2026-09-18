@@ -3,10 +3,11 @@ CLAUDE.md
 
 __pycache__/
 *.pyc
-.venv/
+.venv
 venv/
 .env
 .env.*
+!.env.example
 
 .DS_Store
 .Rhistory
@@ -14,6 +15,7 @@ venv/
 # dbt
 target/
 dbt_packages/
+.user.yml
 logs/
 
 # Lambda build artifacts

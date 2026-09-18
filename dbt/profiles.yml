@@ -1,0 +1,22 @@
+datatrace:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: datatrace
+      password: datatrace
+      dbname: datatrace
+      schema: analytics
+      threads: 4
+    prod:
+      type: postgres
+      host: "{{ env_var('DBT_HOST') }}"
+      port: 5432
+      user: "{{ env_var('DBT_USER') }}"
+      password: "{{ env_var('DBT_PASSWORD') }}"
+      dbname: datatrace
+      schema: analytics
+      sslmode: require
+      threads: 4

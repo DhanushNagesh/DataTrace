@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: postings
+    description: One row per US-accessible posting with its latest attributes and first/last seen timestamps.
+    columns:
+      - name: posting_key
+        description: source:board:posting_id
+        data_tests: [unique, not_null]
+      - name: first_seen_at
+        description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
+        data_tests: [not_null]
+      - name: is_active
+        description: Seen in the most recent run that returned this board's postings.
+        data_tests: [not_null]
+      - name: is_remote_anywhere
+        description: Remote with no region stated. Counted as US-accessible, though some of these may quietly exclude US hires.

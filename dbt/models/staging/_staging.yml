@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_greenhouse__postings
+    description: Typed Greenhouse observations, all countries, with an is_us flag.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: posting_key
+        data_tests: [not_null]
+      - name: title
+        data_tests: [not_null]
+
+  - name: stg_lever__postings
+    description: Typed Lever observations, all countries, with an is_us flag.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: board
+        description: Boards missing from seeds/lever_companies.csv show a slug-derived company name.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('lever_companies')
+                field: board
+              config:
+                severity: warn
+      - name: posting_key
+        data_tests: [not_null]
+      - name: title
+        data_tests: [not_null]
+
+  - name: stg_remoteok__postings
+    description: Typed RemoteOK observations with an is_us flag. RemoteOK is remote-only.
+    data_tests:
+      - unique:
+          column_name: "posting_key || '@' || observed_at"
+    columns:
+      - name: posting_key
+        data_tests: [not_null]
+
+  - name: stg_job_postings
+    description: US-accessible observations (US location or unrestricted remote) from every source, one row per posting per ingest run.
+    columns:
+      - name: source
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [greenhouse, lever, remoteok]
+
+  - name: stg_board_runs
+    description: Which ingest runs saw each board.

@@ -1,0 +1,19 @@
+# Local stand-in for RDS so dbt development costs nothing. Keep the major version in step with RDS.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: datatrace
+      POSTGRES_PASSWORD: datatrace
+      POSTGRES_DB: datatrace
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "datatrace"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  pgdata:
