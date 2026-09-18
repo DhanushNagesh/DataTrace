@@ -27,10 +27,10 @@ board_latest as (
 
 select
     latest.posting_key,
+    {{ company_key('latest.company') }} as company_key,
     latest.source,
     latest.board,
     latest.posting_id,
-    latest.company,
     latest.title,
     latest.location,
     latest.department,
@@ -47,8 +47,15 @@ select
     seen.first_seen_at,
     seen.last_seen_at,
     seen.times_seen,
-    -- Active means present in the board's latest run, so a board outage doesn't close its postings
-    seen.last_seen_at = board_latest.latest_run_at as is_active
+    -- Active means present in the board's latest run, so a board outage doesn't close its postings.
+    -- RemoteOK's feed only holds its newest ~100 jobs, so dropping out of it says nothing about closing.
+    case
+        when latest.source = 'remoteok' then null
+        else seen.last_seen_at = board_latest.latest_run_at
+    end as is_active,
+    -- published_at predates the pipeline, so this isn't capped at how long ingestion has been running
+    extract(epoch from seen.last_seen_at - coalesce(latest.published_at, seen.first_seen_at)) / 86400
+        as days_listed
 from latest
 join seen using (posting_key)
 join board_latest

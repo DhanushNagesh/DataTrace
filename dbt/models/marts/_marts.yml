@@ -1,17 +1,48 @@
 version: 2
 
 models:
-  - name: postings
-    description: One row per US-accessible posting with its latest attributes and first/last seen timestamps.
+  - name: fct_job_postings
+    description: >
+      Accumulating snapshot, one row per US-accessible posting, with its latest attributes and
+      first/last seen timestamps. Updated in place as later runs see (or stop seeing) the posting.
     columns:
       - name: posting_key
         description: source:board:posting_id
         data_tests: [unique, not_null]
+      - name: company_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_companies')
+                field: company_key
       - name: first_seen_at
         description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
         data_tests: [not_null]
       - name: is_active
-        description: Seen in the most recent run that returned this board's postings.
-        data_tests: [not_null]
+        description: >
+          Seen in the most recent run that returned this board's postings. Null for RemoteOK, whose
+          feed is a rolling window of recent jobs, so absence doesn't mean closed.
+        data_tests:
+          - not_null:
+              config:
+                where: "source <> 'remoteok'"
+      - name: days_listed
+        description: >
+          Days from publish (or first seen, if the source has no publish date) to last seen. Total
+          lifetime for closed postings, age so far for active ones. Closed postings actually closed
+          somewhere between last_seen_at and the next run, so this undercounts by up to one run interval.
       - name: is_remote_anywhere
         description: Remote with no region stated. Counted as US-accessible, though some of these may quietly exclude US hires.
+
+  - name: dim_companies
+    description: One row per hiring company, keyed on the normalized company name.
+    columns:
+      - name: company_key
+        description: md5 of lower(trim(company name)).
+        data_tests: [unique, not_null]
+      - name: company_name
+        description: Most common spelling of the name across observations.
+        data_tests: [not_null]
+      - name: sources
+        description: Comma-separated sources the company has posted on.
