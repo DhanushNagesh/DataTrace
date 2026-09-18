@@ -2,13 +2,16 @@
 # One-time setup for the raw landing bucket. Safe to re-run.
 set -euo pipefail
 
-REGION="${AWS_REGION:-us-west-2}"
+REGION="${AWS_REGION:-$(aws configure get region)}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 BUCKET="datatrace-raw-${ACCOUNT_ID}-${REGION}"
 
 if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-  aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
-    --create-bucket-configuration LocationConstraint="$REGION"
+  # The AWS (new) free plan denies s3:CreateBucket from the CLI via an org SCP,
+  # so the bucket itself has to be created in the console. Everything else works.
+  echo "Bucket $BUCKET does not exist."
+  echo "Create it in the S3 console (region $REGION, defaults are fine), then re-run."
+  exit 1
 fi
 
 aws s3api put-public-access-block --bucket "$BUCKET" \
