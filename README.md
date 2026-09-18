@@ -42,3 +42,8 @@ objects under `raw/` and write its own log group. Deploy a new build with:
 A full run takes about 45s and peaks under 200 MB. EventBridge Scheduler
 (`datatrace-ingest-daily`) invokes it at 06:00 America/Los_Angeles with no
 retries, using the `datatrace-scheduler` role, which can only invoke this function.
+
+`infra/alarms.sh <email>` sets up email alerts through the `datatrace-alerts` SNS
+topic: the run errored or timed out (`datatrace-ingest-errors`), no run in 24h
+(`datatrace-ingest-missed`), or any board failed (`datatrace-ingest-source-failures`,
+from a log metric filter). The run manifest says which boards failed.
