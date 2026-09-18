@@ -1,4 +1,6 @@
-# Company board tokens. Greenhouse: boards.greenhouse.io/<token>, Lever: jobs.lever.co/<token>
+# Company board tokens. Greenhouse: boards.greenhouse.io/<token>, Lever: jobs.lever.co/<token>,
+# Ashby: jobs.ashbyhq.com/<token>, SmartRecruiters: jobs.smartrecruiters.com/<token>,
+# Rippling: ats.rippling.com/<token>/jobs
 # Scope is US jobs; boards chosen for US-heavy postings across industries.
 greenhouse = [
     # tech / AI / infra
@@ -19,3 +21,10 @@ greenhouse = [
     "lucidmotors", "relativity",
 ]
 lever = ["spotify", "palantir", "veeva", "zoox", "shieldai"]
+ashby = [
+    "openai", "ramp", "notion", "linear", "cursor", "perplexity", "supabase", "plaid",
+    "snowflake", "benchling", "harvey", "elevenlabs",
+]
+# Tokens are case-sensitive company identifiers, not always the plain name
+smartrecruiters = ["ServiceNow", "LinkedIn3", "NBCUniversal3", "Equinox"]
+rippling = ["rippling"]
