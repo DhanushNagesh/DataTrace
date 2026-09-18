@@ -1,0 +1,30 @@
+location,expected_is_us
+"New York, New York, United States",true
+United States,true
+"San Francisco, CA",true
+Remote - US,true
+Remote - USA,true
+"San Francisco, CA | New York City, NY",true
+"Long Beach, California",true
+"Cary,North Carolina,United States",true
+"Newark, CA",true
+"Southfield, MI",true
+"San Francisco, CA, US; Remote, US",true
+United States - Remote,true
+"Washington, DC",true
+New York City,true
+"Atlanta, Georgia, United States",true
+U.S. Remote,true
+"Bengaluru, India",false
+Singapore,false
+"London, UK",false
+Remote Canada,false
+"Toronto, Ontario, Canada",false
+"Tbilisi, Georgia",false
+"Mexico City, Mexico",false
+Remote,false
+"Dublin, Ireland",false
+Join us in Berlin,false
+,false
+"Toronto, ON, CA",false
+"Toronto, ON, CA; Austin, TX",true

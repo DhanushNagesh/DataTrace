@@ -1,0 +1,9 @@
+version: 2
+
+seeds:
+  - name: us_location_cases
+    description: Hand-labelled location strings that pin down the is_us_location macro.
+    config:
+      column_types:
+        location: text
+        expected_is_us: boolean

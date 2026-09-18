@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Append-only landing tables written by datatrace-load. One row per posting per ingest run.
+    tables:
+      - name: job_postings
+        columns:
+          - name: payload
+            description: Posting exactly as the source API returned it.
+      - name: loaded_runs
