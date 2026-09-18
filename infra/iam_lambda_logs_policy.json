@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OwnLogGroupOnly",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": [
+        "arn:aws:logs:us-east-1:264350941264:log-group:/aws/lambda/datatrace-ingest",
+        "arn:aws:logs:us-east-1:264350941264:log-group:/aws/lambda/datatrace-ingest:*"
+      ]
+    }
+  ]
+}
