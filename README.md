@@ -23,3 +23,12 @@ Bucket creation is blocked from the CLI by an org policy, so create
 
 `botocore[crt]` is a dev dependency because boto3 needs it to read `aws login`
 credentials; Lambda uses its execution role instead.
+
+## Lambda
+
+`datatrace.lambda_handler.handler` wraps the same `run()` as the CLI. It reads
+`DATATRACE_OUT` for the destination and accepts an optional
+`{"sources": [...]}` event for test invokes. Build the arm64 / python3.13 zip
+(requests + the package + `config/boards.toml`, about 650K) with:
+
+    infra/build_lambda.sh

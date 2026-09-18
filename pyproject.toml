@@ -17,6 +17,10 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]
+# Runtime deps shipped in the Lambda zip. boto3 is provided by the Lambda runtime.
+lambda = [
+    "requests>=2.34.2",
+]
 
 [project.scripts]
 datatrace-ingest = "datatrace.ingest:main"
