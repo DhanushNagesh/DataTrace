@@ -39,4 +39,6 @@ objects under `raw/` and write its own log group. Deploy a new build with:
 
     aws lambda update-function-code --function-name datatrace-ingest --zip-file fileb://dist/ingest.zip
 
-A full run takes about 45s and peaks under 200 MB.
+A full run takes about 45s and peaks under 200 MB. EventBridge Scheduler
+(`datatrace-ingest-daily`) invokes it at 06:00 America/Los_Angeles with no
+retries, using the `datatrace-scheduler` role, which can only invoke this function.
