@@ -1,0 +1,37 @@
+title,expected_role_family,expected_seniority
+Senior Data Analyst,data_analytics,senior
+Data Analyst Intern (Summer 2027),data_analytics,intern
+Senior Product Analyst,data_analytics,senior
+Payroll Tax Analyst,corporate,mid
+Underwriting Senior Analyst,other,senior
+Head of Analyst Relations,marketing,director_plus
+Data Engineer,data_engineering,mid
+Analytics Engineer,data_engineering,mid
+"Staff Software Engineer, Data Platform",data_engineering,staff_plus
+Senior Product Manager - Observability Data Platform,product,senior
+"Technical Program Manager, Storage & Data Infrastructure",operations_support,mid
+Senior Data Scientist,data_science_ml,senior
+Staff Machine Learning Engineer,data_science_ml,staff_plus
+Principal Software Engineer,engineering,staff_plus
+Software Engineer II,engineering,mid
+Software Engineer I,engineering,entry
+New Grad Software Engineer,engineering,entry
+Solutions Engineer,sales_success,mid
+"Account Executive, Enterprise",sales_success,mid
+Product Marketing Manager,marketing,mid
+Product Designer,design,mid
+Senior Product Manager,product,senior
+Director of Engineering,engineering,director_plus
+"VP, Finance",corporate,director_plus
+Recruiting Coordinator,corporate,mid
+Customer Support Specialist,operations_support,mid
+Pilates Instructor,other,mid
+Enterprise Account Exec (Armis/Veza),sales_success,mid
+Bilingual Hybrid Development Representative - Mandarin,sales_success,mid
+Director - GSI Partners North America (Armis/Veza),sales_success,director_plus
+Customer Service Representative,operations_support,mid
+"Director, Internal Audit",corporate,director_plus
+Administrative Assistant,corporate,mid
+Executive Business Partner,corporate,mid
+HR Business Partner,corporate,mid
+Restaurant General Manager,other,mid
