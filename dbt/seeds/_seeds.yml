@@ -8,6 +8,14 @@ seeds:
         location: text
         expected_is_us: boolean
 
+  - name: role_title_cases
+    description: Hand-labelled job titles that pin down the role_family and seniority macros.
+    config:
+      column_types:
+        title: text
+        expected_role_family: text
+        expected_seniority: text
+
   - name: board_companies
     description: Display names for boards whose API carries no company name (Lever, Ashby). Add a row when adding such a board.
     data_tests:

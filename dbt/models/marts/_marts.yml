@@ -16,6 +16,18 @@ models:
               arguments:
                 to: ref('dim_companies')
                 field: company_key
+      - name: role_family
+        description: Title bucketed by the role_family macro. Keyword heuristic, pinned by seeds/role_title_cases.csv.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [data_engineering, data_science_ml, data_analytics, sales_success, marketing, design, product, engineering, corporate, operations_support, other]
+      - name: seniority
+        description: Seniority from title keywords. Titles with no signal default to mid.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [intern, entry, mid, senior, staff_plus, director_plus]
       - name: first_seen_at
         description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
         data_tests: [not_null]

@@ -23,7 +23,9 @@ Python (ingestion) → AWS Lambda (EventBridge schedule) → S3 (raw landing)
 Tableau Public (dashboard)
 
 ## Sources
-Greenhouse and Lever public JSON APIs, plus RemoteOK. US jobs only —
+Greenhouse, Lever, Ashby, SmartRecruiters and Rippling public JSON APIs, plus
+RemoteOK. Workday, iCIMS, Oracle and similar enterprise ATSs are out of scope
+(no clean public API). US jobs only —
 raw lands unfiltered, US filter happens in dbt staging. Arbeitnow dropped
 (EU-only board). No scraping LinkedIn/Indeed.
 

@@ -32,6 +32,8 @@ select
     latest.board,
     latest.posting_id,
     latest.title,
+    {{ role_family('latest.title') }} as role_family,
+    {{ seniority('latest.title') }} as seniority,
     latest.location,
     latest.department,
     latest.employment_type,
