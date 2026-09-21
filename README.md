@@ -114,3 +114,16 @@ Lever and Ashby have no company name in their APIs; `seeds/board_companies.csv` 
 source and board to a display name, and a warn-level test flags boards missing from it.
 Salary periods are normalised to year/month/week/day/hour by the `pay_interval` macro.
 Rippling lists several tiered pay ranges per posting; staging keeps the first USD range.
+
+## Tableau
+
+Tableau Public can't connect to Postgres, so the dashboard reads a CSV extract of
+`marts.rpt_postings`: one row per posting with display labels, `company_name`, annualised USD
+pay (`salary_annual_mid_usd`) and `data_as_of` already on it. Aggregation happens in Tableau.
+
+    cd dbt && uv run dbt build && cd ..
+    uv run datatrace-export          # writes exports/rpt_postings.csv
+
+To refresh the published dashboard, re-export, open the workbook in Tableau Public, refresh
+the data source and save it back to Tableau Public. Filter on `is_open` for current postings;
+RemoteOK rows count as open because its feed can't tell us when a job closes.

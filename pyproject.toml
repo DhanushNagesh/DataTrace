@@ -25,6 +25,7 @@ lambda = [
 [project.scripts]
 datatrace-ingest = "datatrace.ingest:main"
 datatrace-load = "datatrace.load:main"
+datatrace-export = "datatrace.export:main"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

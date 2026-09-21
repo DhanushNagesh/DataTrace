@@ -64,3 +64,24 @@ models:
         data_tests: [not_null]
       - name: sources
         description: Comma-separated sources the company has posted on.
+
+  - name: rpt_postings
+    description: >
+      Denormalised copy of fct_job_postings for Tableau Public, which can't query Postgres. Exported
+      to CSV by datatrace-export. Labels are display-ready; filter on is_open for current postings.
+    columns:
+      - name: posting_key
+        data_tests: [unique, not_null]
+      - name: company_name
+        data_tests: [not_null]
+      - name: seniority_rank
+        description: 1 (intern) to 6 (director+), for sorting seniority in Tableau.
+        data_tests: [not_null]
+      - name: salary_annual_mid_usd
+        description: >
+          Midpoint of the USD pay range, annualised (2,080 hours, 260 days, 52 weeks). Null when the
+          posting has no USD pay or the result falls outside 15k-1M, which means a mislabelled interval.
+      - name: is_open
+        description: is_active, with RemoteOK's null counted as open.
+      - name: data_as_of
+        description: Latest ingest run in the warehouse, repeated on every row for the dashboard footer.
