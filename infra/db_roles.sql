@@ -20,3 +20,17 @@ alter role api_reader set default_transaction_read_only = on;
 alter role api_reader set statement_timeout = '5s';
 alter role api_reader set idle_in_transaction_session_timeout = '30s';
 alter role api_reader connection limit 10;
+
+-- datatrace_pipeline owns the warehouse: the loader writes raw, dbt builds staging and marts.
+-- It logs in with an IAM token too, so no pipeline password exists either.
+do $$
+begin
+    if not exists (select from pg_roles where rolname = 'datatrace_pipeline') then
+        create role datatrace_pipeline login;
+    end if;
+    if exists (select from pg_roles where rolname = 'rds_iam') then
+        grant rds_iam to datatrace_pipeline;
+    end if;
+    execute format('grant create on database %I to datatrace_pipeline', current_database());
+end
+$$;

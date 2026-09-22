@@ -1,11 +1,12 @@
 import datetime as dt
 import json
 import logging
-import os
 from decimal import Decimal
 
 import psycopg
 from psycopg.rows import dict_row
+
+from datatrace import db
 
 logging.getLogger().setLevel(logging.INFO)
 log = logging.getLogger("datatrace.api")
@@ -26,9 +27,7 @@ def get_conn() -> psycopg.Connection:
     global _conn
     if _conn is None or _conn.closed:
         # autocommit so a failed query can't leave a warm connection stuck in an aborted transaction
-        _conn = psycopg.connect(
-            os.environ["DATABASE_URL"], autocommit=True, row_factory=dict_row
-        )
+        _conn = db.connect(autocommit=True, row_factory=dict_row)
     return _conn
 
 
@@ -37,7 +36,8 @@ def stats(conn: psycopg.Connection, params: dict) -> dict:
         """
         select
             count(*) filter (where is_open) as open_postings,
-            count(*) filter (where first_seen_at >= data_as_of - interval '7 days') as new_this_week,
+            count(*) filter (where is_open and first_seen_at >= data_as_of - interval '7 days')
+                as new_this_week,
             count(distinct company_name) filter (where is_open) as companies,
             count(distinct source) as sources,
             max(data_as_of) as data_as_of

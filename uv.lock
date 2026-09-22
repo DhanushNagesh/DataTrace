@@ -408,6 +408,13 @@ dev = [
 lambda = [
     { name = "requests" },
 ]
+lambda-db = [
+    { name = "psycopg", extra = ["binary"] },
+]
+lambda-dbt = [
+    { name = "boto3" },
+    { name = "dbt-postgres" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -426,6 +433,11 @@ dev = [
     { name = "ruff", specifier = ">=0.16.8" },
 ]
 lambda = [{ name = "requests", specifier = ">=2.34.2" }]
+lambda-db = [{ name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" }]
+lambda-dbt = [
+    { name = "boto3", specifier = ">=1.43.96" },
+    { name = "dbt-postgres", specifier = ">=1.11.0" },
+]
 
 [[package]]
 name = "dbt-adapters"

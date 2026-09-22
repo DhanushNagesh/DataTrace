@@ -1,0 +1,50 @@
+{
+  "Comment": "Daily pipeline: job boards to S3, S3 to RDS, then dbt. Each step waits for the one before it.",
+  "StartAt": "Ingest",
+  "States": {
+    "Ingest": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "datatrace-ingest", "Payload": {}},
+      "TimeoutSeconds": 600,
+      "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 15, "MaxAttempts": 2, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify"}],
+      "ResultSelector": {"records.$": "$.Payload.records", "failed.$": "$.Payload.failed"},
+      "ResultPath": "$.ingest",
+      "Next": "Load"
+    },
+    "Load": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "datatrace-load", "Payload": {}},
+      "TimeoutSeconds": 900,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 30, "MaxAttempts": 2, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify"}],
+      "ResultSelector": {"runs.$": "$.Payload.runs", "records.$": "$.Payload.records"},
+      "ResultPath": "$.load",
+      "Next": "Dbt"
+    },
+    "Dbt": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {"FunctionName": "datatrace-dbt", "Payload": {}},
+      "TimeoutSeconds": 1200,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 60, "MaxAttempts": 1, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify"}],
+      "ResultSelector": {"counts.$": "$.Payload.counts"},
+      "ResultPath": "$.dbt",
+      "End": true
+    },
+    "Notify": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:REGION:ACCOUNT:datatrace-alerts",
+        "Subject": "DataTrace pipeline failed",
+        "Message.$": "States.JsonToString($)"
+      },
+      "Next": "Failed"
+    },
+    "Failed": {"Type": "Fail", "Error": "PipelineFailed"}
+  }
+}
