@@ -1,8 +1,8 @@
 # DataTrace
 
-A job market analytics pipeline that pulls postings from public job board APIs, lands them in S3, models them in Postgres with dbt, and surfaces trends in Tableau.
+A job market analytics pipeline that pulls postings from public job board APIs, lands them in S3, models them in Postgres with dbt, and serves them through a read-only API to a Next.js dashboard.
 
-Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt → Tableau Public
+Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt → API Gateway → Next.js on Vercel (and a Tableau Public extract)
 
 Sources: public job board APIs from Greenhouse, Lever, Ashby, SmartRecruiters and Rippling (company
 boards listed in `config/boards.toml`), plus the RemoteOK feed. Scope: US-accessible postings,
@@ -232,7 +232,7 @@ minutes.
     infra/api.sh https://<site>.vercel.app      # once the browser calls the API directly
 
     GET /stats            marts.rpt_stats           headline counts and the data freshness timestamp
-    GET /postings         open postings, filtered by q, role_family, work_mode; limit/offset
+    GET /postings         open postings, filtered and paged (see below)
     GET /role-mix         marts.rpt_role_mix        share of open postings by role family
     GET /seniority-mix    marts.rpt_seniority_mix   seniority split within each role family
     GET /salary-by-role   marts.rpt_salary_by_role  p25/median/p75 annualised USD pay by role family
@@ -241,7 +241,14 @@ minutes.
 
 Every route but `/postings` is a straight `select * from marts.<table>`: each mart is already the
 shape its dashboard section needs, aggregated once a day by dbt rather than on every request.
-`/postings` still filters and pages, since it serves rows rather than a fixed aggregate.
+`/postings` still filters and pages, since it serves rows rather than a fixed aggregate. It takes
+`q`, `company`, `role_family`, `seniority`, `work_mode`, `source`, `min_salary`, `sort`, `limit`
+and `offset`. Every filter is a bound parameter that a null switches off; `sort` is the one value
+that becomes SQL text, so it is looked up in a whitelist and a request can only pick an ordering,
+never write one. Each ordering ends on `posting_key` so paging can't repeat or skip a row.
+
+The response carries a `total` for the filtered set, computed with `count(*) over ()` in the same
+scan the page comes from — one query, not two, and the browser can say how many roles matched.
 
 The Lambda logs in as `api_reader` with an IAM token, in the `datatrace-api-lambda` security
 group, which may only open connections to Postgres. Its IAM policy allows `rds-db:connect` as
@@ -269,6 +276,52 @@ mart or can read anything in `raw`, `staging` or `seeds`.
 
 The role can switch `default_transaction_read_only` off itself, so writes are really blocked by
 it having no write privileges. The setting is a second layer.
+
+## Frontend
+
+`web/` is a Next.js App Router site deployed on Vercel. Every page is a React Server
+Component: the browser never talks to the API, Vercel's Node runtime does, so the API
+Gateway URL stays in `DATATRACE_API_URL` (a server-side env var, not `NEXT_PUBLIC_`) and the
+API needs no CORS configuration at all.
+
+    cd web
+    npm install
+    cp .env.example .env.local     # paste the URL infra/api.sh printed
+    npm run dev
+
+- `/` is statically prerendered with `revalidate: 300`, matching the `cache-control` the Lambda
+  sends. One visitor's request warms it; everyone else that five minutes is served from the edge
+  cache, so a burst of traffic is a handful of Lambda invocations, not one per visitor. The data
+  changes once a day, so nothing is ever more than 5 minutes stale anyway.
+- `/postings` is dynamic because its filters live in the URL. The free-text fields are a plain
+  GET `<form>`; each facet is a popover of `<Link>`s built on the server. Nothing fetches from
+  the browser, and every filtered view is a shareable, cacheable URL. Radix's popover is the only
+  client-side state on the page — it owns open/closed and nothing else.
+- Charts: the mix and salary sections are server-rendered HTML/CSS marks with every value
+  printed, so they ship no JavaScript. Only the two that earn a hover layer (time-to-close,
+  daily flow) are client components using Recharts.
+
+Company logos come from `/logo/[domain]`, a route handler that proxies an icon service. No
+source API gives us a company website, so the domain is guessed from the display name; a miss is
+the expected case and the route answers with a drawn monogram rather than a 404, which is why the
+card stays a server component with no broken-image state to handle. Proxying rather than
+hotlinking means the visitor's browser only ever talks to this site, so browsing the board
+doesn't hand a third party the list of companies you looked at. Each icon is cached for a week,
+so the upstream sees one request per company per week no matter how much traffic the page gets.
+
+The look is three values — cream paper, near-black ink, one burnt orange — with Playfair Display
+for headlines and posting titles, Source Serif for prose, JetBrains Mono for every label and
+number, 1px rules and no border radius. The site is light only; tokens live in `app/globals.css`.
+Orange is the single hue: solid orange is the primary measure in every chart and the one action in
+every control, and the comparison series is carried by a 45° hatch fill or a dashed stroke rather
+than a second colour — the channel a colour-blind or black-and-white reader falls back to anyway.
+At 4.84:1 on the cream it clears AA as text, and white on it clears 5.18:1, so it works as a fill
+and as a foreground. Recharts passes `var(--accent)` straight through to SVG, so the charts need
+no palette config of their own.
+
+On Vercel, set the project's Root Directory to `web` and add `DATATRACE_API_URL` for all three
+environments. The free Hobby plan covers this; the only AWS cost the site adds is API Gateway
+requests and Lambda invocations, both of which the 5-minute cache keeps to a trickle.
 
 ## Tableau
 
