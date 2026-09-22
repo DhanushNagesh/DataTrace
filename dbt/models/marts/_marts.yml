@@ -17,17 +17,21 @@ models:
                 to: ref('dim_companies')
                 field: company_key
       - name: role_family
-        description: Title bucketed by the role_family macro. Keyword heuristic, pinned by seeds/role_title_cases.csv.
+        description: >
+          Bucketed by the role_family macro: title keywords first, department as a fallback for the
+          ~25% of titles with no domain word. Pinned by seeds/role_title_cases.csv.
         data_tests:
           - accepted_values:
               arguments:
-                values: [data_engineering, data_science_ml, data_analytics, sales_success, marketing, design, product, engineering, corporate, operations_support, other]
+                values: [data_engineering, data_science_ml, data_analytics, sales_success, marketing, design, product, engineering, corporate, operations_support, hospitality_fitness, healthcare, other]
       - name: seniority
-        description: Seniority from title keywords. Titles with no signal default to mid.
+        description: >
+          Seniority from title keywords. 'mid' means the posting said so ("Engineer II"); titles
+          stating no level are 'unspecified' rather than being assumed mid.
         data_tests:
           - accepted_values:
               arguments:
-                values: [intern, entry, mid, senior, staff_plus, director_plus]
+                values: [intern, entry, mid, senior, staff_plus, director_plus, unspecified]
       - name: first_seen_at
         description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
         data_tests: [not_null]
@@ -75,7 +79,7 @@ models:
       - name: company_name
         data_tests: [not_null]
       - name: seniority_rank
-        description: 1 (intern) to 6 (director+), for sorting seniority in Tableau.
+        description: 1 (intern) to 6 (director+), 7 unspecified, for sorting seniority in Tableau.
         data_tests: [not_null]
       - name: salary_annual_mid_usd
         description: >

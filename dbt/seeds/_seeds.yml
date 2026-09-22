@@ -13,6 +13,7 @@ seeds:
     config:
       column_types:
         title: text
+        department: text
         expected_role_family: text
         expected_seniority: text
 
