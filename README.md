@@ -204,6 +204,27 @@ Load and dbt retry twice; ingest retries only on Lambda service errors, since a 
 already handled per-source and a rerun would refetch every board. A full run takes about 4.5
 minutes.
 
+## Public API
+
+`infra/api.sh [origin]` deploys `datatrace-api` into the VPC behind an API Gateway **HTTP API**
+(not a REST API: $1 per million requests instead of $3.50, with CORS and throttling built in).
+
+    infra/api.sh                                # no CORS headers; server-side fetches need none
+    infra/api.sh https://<site>.vercel.app      # once the browser calls the API directly
+
+    GET /stats       headline counts and the data freshness timestamp
+    GET /postings    open postings, filtered by q, role_family, work_mode; limit/offset
+
+The Lambda logs in as `api_reader` with an IAM token, in the `datatrace-api-lambda` security
+group, which may only open connections to Postgres. Its IAM policy allows `rds-db:connect` as
+that one database user and nothing else.
+
+Routing lives in the Gateway: only the two routes above exist, so anything else is a 404 that never
+reaches the Lambda. The stage throttles at 10 requests/second with a burst of 20, and responses
+carry `cache-control: max-age=300` since the data changes once a day. CORS is a browser rule, not
+access control — `curl` ignores it — so the real protections are the throttle, the read-only role,
+bound parameters and the caps on `limit`, `offset` and `q`.
+
 ## API role
 
 The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once

@@ -37,8 +37,16 @@ def handler(event, context):
             # Rows from the last statement come back in the response, so check scripts can
             # report what the database looks like from inside the VPC
             if cur.description:
+                names = [c.name for c in cur.description]
+                # Lambda marshals the return value with plain json.dumps, which has no date or
+                # Decimal support; anything it can't take goes back as text
                 rows = [
-                    dict(zip([c.name for c in cur.description], r))
+                    {
+                        k: v
+                        if isinstance(v, (str, int, float, bool, type(None)))
+                        else str(v)
+                        for k, v in zip(names, r)
+                    }
                     for r in cur.fetchall()
                 ]
             log.info("applied %s", path.name)

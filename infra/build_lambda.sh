@@ -9,6 +9,7 @@ case "$TARGET" in
   # psycopg's arm64 wheels need glibc 2.28+; the python3.13 runtime is Amazon Linux 2023 (2.34)
   db-admin)  GROUP=lambda-db; EXTRA_SRC="infra/*.sql";      EXTRA_DST=sql;    PLATFORM=aarch64-manylinux_2_28 ;;
   load)      GROUP=lambda-db; EXTRA_SRC="";                 EXTRA_DST=.;      PLATFORM=aarch64-manylinux_2_28 ;;
+  api)       GROUP=lambda-db; EXTRA_SRC="";                 EXTRA_DST=.;      PLATFORM=aarch64-manylinux_2_28 ;;
   *) echo "unknown target: $TARGET" >&2; exit 1 ;;
 esac
 
