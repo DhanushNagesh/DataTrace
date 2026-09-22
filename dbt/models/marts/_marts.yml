@@ -89,3 +89,79 @@ models:
         description: is_active, with RemoteOK's null counted as open.
       - name: data_as_of
         description: Latest ingest run in the warehouse, repeated on every row for the dashboard footer.
+
+  - name: rpt_stats
+    description: >
+      Single row of headline counts plus the freshness stamp, for the dashboard header. Pre-aggregated
+      here so GET /stats reads one row instead of scanning every posting on each request.
+    columns:
+      - name: open_postings
+        data_tests: [not_null]
+      - name: data_as_of
+        data_tests: [not_null]
+
+  - name: rpt_role_mix
+    description: >
+      One row per role family: share of all open postings, and how much of that family is remote
+      or shows pay. Backs the role mix dashboard section.
+    columns:
+      - name: role_family
+        description: Display label from the role_family_label macro, matching rpt_postings.
+        data_tests: [unique, not_null]
+      - name: pct_remote
+        description: >
+          Share that is US-remote or remote-anywhere, the same split rpt_postings.work_mode makes,
+          so a family's remote share agrees across dashboard sections.
+      - name: pct_with_salary
+        description: Mostly tracks source mix (Greenhouse and SmartRecruiters never publish pay), not role.
+
+  - name: rpt_seniority_mix
+    description: >
+      One row per role family and seniority: pct_of_family is a share of that family, not of all
+      postings. Backs the seniority mix dashboard section.
+    columns:
+      - name: role_family
+        description: Display label from the role_family_label macro, matching rpt_postings.
+        data_tests: [not_null]
+      - name: seniority
+        data_tests: [not_null]
+      - name: seniority_rank
+        description: 1 (intern) to 7 (unspecified). Order by this, not the label, which sorts alphabetically.
+        data_tests: [not_null]
+      - name: pct_of_family
+        data_tests: [not_null]
+    data_tests:
+      - unique:
+          column_name: "role_family || '@' || seniority"
+
+  - name: rpt_salary_by_role
+    description: >
+      Annualised USD salary midpoints by role family (p25/median/p75), restricted to role families
+      with at least 20 salaried postings. Only describes companies on Ashby, Lever, Rippling and
+      RemoteOK, since Greenhouse and SmartRecruiters never publish pay. Backs the salary dashboard section.
+    columns:
+      - name: role_family
+        description: Display label, inherited from rpt_postings.
+        data_tests: [unique, not_null]
+
+  - name: rpt_time_to_close
+    description: >
+      Median and p90 days-listed by role family, over closed postings only. Backs the time-to-close
+      dashboard section.
+    columns:
+      - name: role_family
+        data_tests: [unique, not_null]
+
+  - name: rpt_daily_flow
+    description: >
+      One row per day and role family: open postings (stock), opened/closed (flows), and the
+      week-over-week change in stock. Excludes RemoteOK, whose rolling feed has no true open/close
+      signal. Backs the daily flow dashboard section.
+    columns:
+      - name: day
+        data_tests: [not_null]
+      - name: role_family
+        data_tests: [not_null]
+    data_tests:
+      - unique:
+          column_name: "day || '@' || role_family"

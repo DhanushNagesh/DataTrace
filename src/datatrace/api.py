@@ -32,18 +32,20 @@ def get_conn() -> psycopg.Connection:
 
 
 def stats(conn: psycopg.Connection, params: dict) -> dict:
-    return conn.execute(
-        """
-        select
-            count(*) filter (where is_open) as open_postings,
-            count(*) filter (where is_open and first_seen_at >= data_as_of - interval '7 days')
-                as new_this_week,
-            count(distinct company_name) filter (where is_open) as companies,
-            count(distinct source) as sources,
-            max(data_as_of) as data_as_of
-        from marts.rpt_postings
-        """
-    ).fetchone()
+    # marts.rpt_stats is a single pre-aggregated row. Returned unwrapped, unlike the list routes below.
+    return conn.execute("select * from marts.rpt_stats").fetchone()
+
+
+def mart(table: str, order_by: str):
+    # Each of these marts is a few dozen to a few hundred rows, pre-aggregated once a day by dbt,
+    # so the route is just a select with no per-request aggregation and no query params. table and
+    # order_by are the literals passed below, never request input, so the f-string is safe here.
+    def handler(conn: psycopg.Connection, params: dict) -> dict:
+        rows = conn.execute(f"select * from marts.{table} order by {order_by}").fetchall()
+        return {table.removeprefix("rpt_"): rows}
+
+    handler.table = table
+    return handler
 
 
 def int_param(params: dict, name: str, default: int, maximum: int) -> int:
@@ -97,6 +99,11 @@ def postings(conn: psycopg.Connection, params: dict) -> dict:
 ROUTES = {
     "GET /stats": stats,
     "GET /postings": postings,
+    "GET /role-mix": mart("rpt_role_mix", "postings desc"),
+    "GET /seniority-mix": mart("rpt_seniority_mix", "role_family, seniority_rank"),
+    "GET /salary-by-role": mart("rpt_salary_by_role", "median desc"),
+    "GET /time-to-close": mart("rpt_time_to_close", "median_days"),
+    "GET /daily-flow": mart("rpt_daily_flow", "role_family, day"),
 }
 
 

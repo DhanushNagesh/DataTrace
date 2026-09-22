@@ -20,7 +20,10 @@ POLICY_FILE=infra/iam_api_policy.json
 TIMEOUT=10
 MEMORY=512
 API_NAME=datatrace-api
-ROUTES=("GET /stats" "GET /postings")
+ROUTES=(
+  "GET /stats" "GET /postings"
+  "GET /role-mix" "GET /seniority-mix" "GET /salary-by-role" "GET /time-to-close" "GET /daily-flow"
+)
 ENV="Variables={DB_HOST=$(rds_endpoint),DB_USER=api_reader}"
 
 infra/build_lambda.sh api >/dev/null

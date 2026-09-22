@@ -2,7 +2,7 @@
 -- week-over-week change in stock. Needs a few weeks of daily runs before the trend means anything.
 with postings as (
     select
-        f.role_family,
+        {{ role_family_label('f.role_family') }} as role_family,
         f.first_seen_at::date as opened_on,
         -- First day the posting was gone, assuming daily runs
         case when f.is_active = false then f.last_seen_at::date + 1 end as closed_on,

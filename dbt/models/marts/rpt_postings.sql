@@ -21,34 +21,10 @@ select
     source,
     company_name,
     title,
-    case role_family
-        when 'data_engineering' then 'Data Engineering'
-        when 'data_science_ml' then 'Data Science / ML'
-        when 'data_analytics' then 'Data Analytics'
-        when 'sales_success' then 'Sales & Success'
-        when 'marketing' then 'Marketing'
-        when 'design' then 'Design'
-        when 'product' then 'Product'
-        when 'engineering' then 'Engineering'
-        when 'corporate' then 'Corporate'
-        when 'operations_support' then 'Operations & Support'
-        when 'hospitality_fitness' then 'Hospitality & Fitness'
-        when 'healthcare' then 'Healthcare'
-        else 'Other'
-    end as role_family,
+    {{ role_family_label('role_family') }} as role_family,
     role_family in ('data_engineering', 'data_science_ml', 'data_analytics') as is_data_role,
-    case seniority
-        when 'intern' then 'Intern'
-        when 'entry' then 'Entry'
-        when 'mid' then 'Mid'
-        when 'senior' then 'Senior'
-        when 'staff_plus' then 'Staff+'
-        when 'director_plus' then 'Director+'
-        when 'unspecified' then 'Unspecified'
-    end as seniority,
-    -- Tableau sorts strings alphabetically; sort seniority by this instead. Unspecified sorts last.
-    array_position(array['intern', 'entry', 'mid', 'senior', 'staff_plus', 'director_plus', 'unspecified'], seniority)
-        as seniority_rank,
+    {{ seniority_label('seniority') }} as seniority,
+    {{ seniority_rank('seniority') }} as seniority_rank,
     case
         when is_remote_anywhere then 'Remote (anywhere)'
         when is_remote then 'Remote (US)'

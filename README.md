@@ -110,6 +110,16 @@ pointing at the Docker Postgres and a `prod` target (RDS) that reads `DBT_HOST`,
   null for RemoteOK, whose feed is a rolling window of recent jobs rather than a list of open ones.
 - `marts.dim_companies` (table): one row per company, joined on `company_key` (md5 of the
   normalized name), so the same company across sources is one row.
+- `marts.rpt_stats`, `rpt_role_mix`, `rpt_seniority_mix`, `rpt_salary_by_role`, `rpt_time_to_close`,
+  `rpt_daily_flow` (tables): small pre-aggregated marts, one per dashboard section — one row for
+  `rpt_stats`, tens to a few hundred for the rest — so the API serves each with a plain `select *`
+  instead of aggregating 11k postings on every request. Rebuilt once a day by dbt, like every other mart.
+
+Display labels (`Data Engineering`, `Staff+`) and the seniority sort order come from the
+`role_family_label`, `seniority_label` and `seniority_rank` macros. Every mart calls them, so a
+section built on `fct_job_postings` labels a family exactly as one built on `rpt_postings` does —
+otherwise four of the five sections would serve raw `data_engineering` while the fifth served
+`Data Engineering`, and nothing could cross-filter.
 
 US classification: Lever, Ashby, SmartRecruiters and Rippling carry country fields. Greenhouse
 and RemoteOK only have free text, so they go through the `is_us_location` macro (regex over country names,
@@ -221,14 +231,23 @@ minutes.
     infra/api.sh                                # no CORS headers; server-side fetches need none
     infra/api.sh https://<site>.vercel.app      # once the browser calls the API directly
 
-    GET /stats       headline counts and the data freshness timestamp
-    GET /postings    open postings, filtered by q, role_family, work_mode; limit/offset
+    GET /stats            marts.rpt_stats           headline counts and the data freshness timestamp
+    GET /postings         open postings, filtered by q, role_family, work_mode; limit/offset
+    GET /role-mix         marts.rpt_role_mix        share of open postings by role family
+    GET /seniority-mix    marts.rpt_seniority_mix   seniority split within each role family
+    GET /salary-by-role   marts.rpt_salary_by_role  p25/median/p75 annualised USD pay by role family
+    GET /time-to-close    marts.rpt_time_to_close   median/p90 days listed by role family, closed postings only
+    GET /daily-flow       marts.rpt_daily_flow      daily open/opened/closed by role family, with wow_change
+
+Every route but `/postings` is a straight `select * from marts.<table>`: each mart is already the
+shape its dashboard section needs, aggregated once a day by dbt rather than on every request.
+`/postings` still filters and pages, since it serves rows rather than a fixed aggregate.
 
 The Lambda logs in as `api_reader` with an IAM token, in the `datatrace-api-lambda` security
 group, which may only open connections to Postgres. Its IAM policy allows `rds-db:connect` as
 that one database user and nothing else.
 
-Routing lives in the Gateway: only the two routes above exist, so anything else is a 404 that never
+Routing lives in the Gateway: only the routes above exist, so anything else is a 404 that never
 reaches the Lambda. The stage throttles at 10 requests/second with a burst of 20, and responses
 carry `cache-control: max-age=300` since the data changes once a day. CORS is a browser rule, not
 access control — `curl` ignores it — so the real protections are the throttle, the read-only role,
