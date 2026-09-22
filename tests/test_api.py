@@ -12,15 +12,16 @@ MARTS = """
 create table marts.rpt_postings (
     posting_key text, source text, company_name text, title text, role_family text,
     seniority text, work_mode text, location text, salary_annual_mid_usd numeric,
-    url text, first_seen_at timestamptz, is_open boolean, data_as_of timestamptz
+    url text, first_seen_at timestamptz, is_open boolean, days_listed numeric,
+    data_as_of timestamptz
 );
 insert into marts.rpt_postings values
     ('a', 'lever', 'Acme', 'Data Engineer', 'Data Engineering', 'Mid', 'Remote (US)',
-     'Remote', 150000, 'https://a', '2026-09-17', true, '2026-09-18'),
+     'Remote', 150000, 'https://a', '2026-09-17', true, 3.0, '2026-09-18'),
     ('b', 'greenhouse', 'Beta', 'Account Executive', 'Sales & Success', 'Senior',
-     'On-site / hybrid', 'NYC', null, 'https://b', '2026-08-01', true, '2026-09-18'),
+     'On-site / hybrid', 'NYC', 90000, 'https://b', '2026-08-01', true, 48.0, '2026-09-18'),
     ('c', 'greenhouse', 'Beta', 'Data Analyst', 'Data Analytics', 'Entry',
-     'On-site / hybrid', 'NYC', null, 'https://c', '2026-08-01', false, '2026-09-18');
+     'On-site / hybrid', 'NYC', null, 'https://c', '2026-08-01', false, 48.0, '2026-09-18');
 
 create table marts.rpt_stats (
     open_postings bigint, new_this_week bigint, companies bigint, sources bigint,
@@ -106,6 +107,42 @@ def test_postings_filters_and_excludes_closed(marts):
 
     _, body = call("GET /postings", {"work_mode": "On-site / hybrid", "limit": "1"})
     assert [p["posting_key"] for p in body["postings"]] == ["b"]
+
+
+def test_postings_filters_on_every_facet(marts):
+    for params, expected in [
+        ({"seniority": "Mid"}, ["a"]),
+        ({"source": "greenhouse"}, ["b"]),
+        ({"company": "acm"}, ["a"]),
+        ({"min_salary": "100000"}, ["a"]),
+        ({"role_family": "Data Engineering", "min_salary": "200000"}, []),
+    ]:
+        _, body = call("GET /postings", params)
+        assert [p["posting_key"] for p in body["postings"]] == expected, params
+
+
+def test_postings_total_counts_the_filtered_set_not_the_page(marts):
+    # Two rows match but only one is returned, and the count still describes the whole match
+    _, body = call("GET /postings", {"limit": "1"})
+    assert len(body["postings"]) == 1
+    assert body["total"] == 2
+    assert "total" not in body["postings"][0]
+
+    _, body = call("GET /postings", {"q": "nothing matches this"})
+    assert body["total"] == 0
+
+
+def test_postings_sorts_only_by_a_known_key(marts):
+    _, body = call("GET /postings", {"sort": "salary_high"})
+    assert [p["posting_key"] for p in body["postings"]] == ["a", "b"]
+
+    _, body = call("GET /postings", {"sort": "company"})
+    assert [p["posting_key"] for p in body["postings"]] == ["a", "b"]
+
+    status, body = call(
+        "GET /postings", {"sort": "first_seen_at; drop table marts.rpt_postings"}
+    )
+    assert status == 400
 
 
 def test_postings_treats_input_as_data(marts):
