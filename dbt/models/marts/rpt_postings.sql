@@ -32,6 +32,8 @@ select
         when 'engineering' then 'Engineering'
         when 'corporate' then 'Corporate'
         when 'operations_support' then 'Operations & Support'
+        when 'hospitality_fitness' then 'Hospitality & Fitness'
+        when 'healthcare' then 'Healthcare'
         else 'Other'
     end as role_family,
     role_family in ('data_engineering', 'data_science_ml', 'data_analytics') as is_data_role,
@@ -42,9 +44,10 @@ select
         when 'senior' then 'Senior'
         when 'staff_plus' then 'Staff+'
         when 'director_plus' then 'Director+'
+        when 'unspecified' then 'Unspecified'
     end as seniority,
-    -- Tableau sorts strings alphabetically; sort seniority by this instead
-    array_position(array['intern', 'entry', 'mid', 'senior', 'staff_plus', 'director_plus'], seniority)
+    -- Tableau sorts strings alphabetically; sort seniority by this instead. Unspecified sorts last.
+    array_position(array['intern', 'entry', 'mid', 'senior', 'staff_plus', 'director_plus', 'unspecified'], seniority)
         as seniority_rank,
     case
         when is_remote_anywhere then 'Remote (anywhere)'

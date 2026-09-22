@@ -8,6 +8,12 @@ seed-paths: ["seeds"]
 test-paths: ["tests"]
 analysis-paths: ["analyses"]
 
+# api_reader (infra/db_roles.sql) may read marts and nothing else. Schema usage is granted here
+# because it outlives any one model; table grants below, because dbt recreates tables on every build.
+on-run-start:
+  - "create schema if not exists marts"
+  - "grant usage on schema marts to api_reader"
+
 models:
   datatrace:
     staging:
@@ -16,6 +22,8 @@ models:
     marts:
       +schema: marts
       +materialized: table
+      +grants:
+        select: ["api_reader"]
 
 seeds:
   datatrace:

@@ -1,6 +1,8 @@
 {#
-  Seniority from title keywords. Titles with no signal land in 'mid', which makes mid the
-  noisiest bucket: "Software Engineer" at one company is another company's junior role.
+  Seniority from title keywords. Titles stating no level land in 'unspecified' rather than 'mid':
+  96% of what an earlier default-to-mid rule called mid had no level in the title at all, which
+  made mid look like half the market when it was really the absence of a signal. 'mid' now means
+  the posting said so ("Engineer II", "mid-level").
 #}
 {% macro seniority(title) -%}
     case
@@ -14,6 +16,8 @@
             then 'senior'
         when {{ title }} ~* '\y(junior|jr\.?|entry|new grad(uate)?|graduate|early career|associate)\y|\y(i|1)\y'
             then 'entry'
-        else 'mid'
+        when {{ title }} ~* '\y(ii|2)\y|mid.?level|intermediate'
+            then 'mid'
+        else 'unspecified'
     end
 {%- endmacro %}
