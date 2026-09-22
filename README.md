@@ -115,6 +115,23 @@ source and board to a display name, and a warn-level test flags boards missing f
 Salary periods are normalised to year/month/week/day/hour by the `pay_interval` macro.
 Rippling lists several tiered pay ranges per posting; staging keeps the first USD range.
 
+## API role
+
+The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once
+per database (it is safe to rerun), before the first `dbt build`:
+
+    docker compose exec -T postgres psql -U datatrace -d datatrace -v ON_ERROR_STOP=1 < infra/db_roles.sql
+
+The script only creates the role and its session defaults: read-only transactions, a 5s statement
+timeout, and at most 10 connections. On RDS it also grants `rds_iam`, so the role logs in with IAM
+tokens instead of a password. dbt handles access: an `on-run-start` hook grants usage on `marts`,
+and a `grants` config re-grants `select` each time dbt rebuilds a mart table, since a new table
+starts with no grants. `tests/assert_api_reader_grants.sql` fails the build if api_reader can't read a
+mart or can read anything in `raw`, `staging` or `seeds`.
+
+The role can switch `default_transaction_read_only` off itself, so writes are really blocked by
+it having no write privileges. The setting is a second layer.
+
 ## Tableau
 
 Tableau Public can't connect to Postgres, so the dashboard reads a CSV extract of
