@@ -19,4 +19,8 @@ datatrace:
       dbname: datatrace
       schema: analytics
       sslmode: require
-      threads: 4
+      # db.t4g.micro runs on CPU credits and 1 GB of RAM: four parallel connections exhaust them
+      # and later connections time out. Two threads, a longer connect timeout, and one retry.
+      threads: 2
+      connect_timeout: 30
+      retries: 2

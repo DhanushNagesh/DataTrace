@@ -2,6 +2,8 @@ import os
 
 import psycopg
 
+from datatrace.rds_auth import iam_token
+
 
 def connect(**kwargs) -> psycopg.Connection:
     """Connects to the warehouse.
@@ -14,12 +16,10 @@ def connect(**kwargs) -> psycopg.Connection:
     if url:
         return psycopg.connect(url, **kwargs)
 
-    import boto3
-
     host = os.environ["DB_HOST"]
     port = int(os.environ.get("DB_PORT", "5432"))
     user = os.environ["DB_USER"]
-    token = boto3.client("rds").generate_db_auth_token(host, port, user)
+    token = iam_token(host, port, user)
     return psycopg.connect(
         host=host,
         port=port,

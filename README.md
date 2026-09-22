@@ -162,6 +162,32 @@ copy and that transaction rolls back, so a race costs time, not correctness.
 
     infra/db_admin.sh '{"scripts":["check_load.sql"]}'   # runs and rows landed so far
 
+## dbt Lambda
+
+dbt-postgres is far past the 250 MB zip limit, so `datatrace-dbt` ships as a container image
+(`infra/dbt.Dockerfile`, pushed to ECR by `infra/dbt.sh`; a lifecycle policy keeps the last two
+images, about $0.25/month). The dbt project is baked into the image, and an invoke may only pick a
+command from `dbt_handler.ALLOWED` — `run-operation` is excluded, since it would run arbitrary SQL
+as the owner of every table.
+
+    infra/dbt.sh                          # dbt build against the prod (RDS) target
+    infra/dbt.sh '{"command":["test"]}'
+
+`profiles.yml`'s prod target reads `DBT_HOST`/`DBT_USER`/`DBT_PASSWORD`; the handler fills them from
+`DB_HOST`/`DB_USER` and an IAM token, so dbt logs in as `datatrace_pipeline` with no password.
+
+Three things Lambda forces on dbt, all handled in `dbt_handler`:
+
+- No `/dev/shm`, so POSIX semaphores fail. dbt's mp context and its `DbtThreadPool`
+  (a `multiprocessing.pool.ThreadPool`) are swapped for thread locks and a `ThreadPoolExecutor`.
+  dbt runs nodes in threads anyway. Both patches must happen before `dbt.cli.main` is imported.
+- Only `/tmp` is writable: `DBT_LOG_PATH` and `DBT_TARGET_PATH` point there.
+- Lambda rejects the OCI image index that buildx produces by default, hence
+  `--provenance=false --sbom=false`.
+
+Prod runs two threads, not four: on db.t4g.micro four parallel connections exhausted the instance's
+CPU credits and later connections timed out mid-build.
+
 ## API role
 
 The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once
