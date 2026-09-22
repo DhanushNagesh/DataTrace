@@ -59,10 +59,19 @@ A full run takes about 3.5 minutes, most of it the ~2,000 SmartRecruiters detail
 (`datatrace-ingest-daily`) invokes it at 06:00 America/Los_Angeles with no
 retries, using the `datatrace-scheduler` role, which can only invoke this function.
 
-`infra/alarms.sh <email>` sets up email alerts through the `datatrace-alerts` SNS
-topic: the run errored or timed out (`datatrace-ingest-errors`), no run in 24h
-(`datatrace-ingest-missed`), or any board failed (`datatrace-ingest-source-failures`,
-from a log metric filter). The run manifest says which boards failed.
+`infra/alarms.sh [email]` sets up email alerts through the `datatrace-alerts` SNS topic (the
+address is only needed the first time; it is already subscribed):
+
+- `datatrace-ingest-errors`: the ingest Lambda crashed or timed out.
+- `datatrace-ingest-source-failures`: a board failed, counted from the logs by a metric filter.
+  The run manifest says which.
+- `datatrace-pipeline-failed`: an execution failed, timed out or was aborted, as one alarm over
+  the sum of all three metrics. The state machine also publishes the failing state itself.
+- `datatrace-pipeline-missed`: no execution started in 24h, treating missing data as breaching.
+  A failing pipeline is loud; a pipeline that never starts is silent, and this is what catches it.
+
+The state machine has a one-hour `TimeoutSeconds`, so a hung run ends and counts as timed out
+instead of blocking the next day's. Four alarms; CloudWatch bills after ten.
 
 ## Local warehouse
 
