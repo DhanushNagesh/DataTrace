@@ -188,6 +188,22 @@ Three things Lambda forces on dbt, all handled in `dbt_handler`:
 Prod runs two threads, not four: on db.t4g.micro four parallel connections exhausted the instance's
 CPU credits and later connections timed out mid-build.
 
+## Daily pipeline
+
+`infra/pipeline.sh` builds the `datatrace-pipeline` state machine: ingest, then load, then dbt,
+each waiting for the one before it. The existing `datatrace-ingest-daily` schedule now starts the
+state machine instead of invoking the ingest Lambda directly, so there is still one trigger at
+06:00 America/Los_Angeles. Any step that fails publishes the execution state to the
+`datatrace-alerts` topic and ends the run as failed. Step Functions Standard is free here
+(~120 of the 4,000 free monthly state transitions).
+
+    infra/pipeline.sh          # create or update, and repoint the schedule
+    infra/pipeline.sh run      # start an execution now
+
+Load and dbt retry twice; ingest retries only on Lambda service errors, since a failed board is
+already handled per-source and a rerun would refetch every board. A full run takes about 4.5
+minutes.
+
 ## API role
 
 The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once

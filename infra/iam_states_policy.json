@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokePipelineFunctions",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": [
+        "arn:aws:lambda:*:*:function:datatrace-ingest",
+        "arn:aws:lambda:*:*:function:datatrace-load",
+        "arn:aws:lambda:*:*:function:datatrace-dbt"
+      ]
+    },
+    {
+      "Sid": "AlertOnFailure",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:*:*:datatrace-alerts"
+    }
+  ]
+}
