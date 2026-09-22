@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Cream paper, near-black ink, one burnt orange. Orange is the only hue in the system: it marks
+   the primary measure in every chart and the one action in every control, and nothing else uses
+   it. At 4.84:1 on the cream it clears AA for body text, and white on it clears 5.18:1, so it
+   works as a fill and as a foreground. */
+:root {
+  color-scheme: light;
+  --paper: #fbf7ee;
+  --paper-2: #f2ebdc;
+  --ink: #17150f;
+  --ink-2: #4a443a;
+  --ink-3: #6f675b;
+  --rule: #17150f;
+  --rule-soft: #ddd4c2;
+  --accent: #c2410c;
+  --on-accent: #ffffff;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  /* Faint ruled-paper texture. 3% alpha: felt, not seen. */
+  background-image: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ink) 3%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+/* The one typographic mannerism the whole UI runs on: small, wide, uppercase mono. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
