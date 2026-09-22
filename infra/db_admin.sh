@@ -55,7 +55,11 @@ else
 fi
 aws lambda wait function-updated --function-name "$FUNCTION"
 
+# Pass a payload to choose scripts, e.g. infra/db_admin.sh '{"scripts":["db_roles.sql"]}'
+PAYLOAD="${1-}"
+[ -z "$PAYLOAD" ] && PAYLOAD='{}'
+
 OUT=$(mktemp)
-aws lambda invoke --function-name "$FUNCTION" --payload "${1:-{\}}" --cli-binary-format raw-in-base64-out "$OUT" \
+aws lambda invoke --function-name "$FUNCTION" --payload "$PAYLOAD" --cli-binary-format raw-in-base64-out "$OUT" \
   --query '[StatusCode,FunctionError]' --output text
 cat "$OUT"; echo

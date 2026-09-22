@@ -30,9 +30,9 @@ def test_applies_requested_scripts_in_order(sql_dir, conn):
     (sql_dir / "a.sql").write_text("drop table if exists t; create table t (n int);")
     (sql_dir / "b.sql").write_text("insert into t values (1), (2);")
 
-    assert db_admin.handler({"scripts": ["a.sql", "b.sql"]}, None) == {
-        "applied": ["a.sql", "b.sql"]
-    }
+    result = db_admin.handler({"scripts": ["a.sql", "b.sql"]}, None)
+
+    assert result == {"applied": ["a.sql", "b.sql"], "rows": None}
     assert conn.execute("select count(*) from t").fetchone()[0] == 2
 
 
@@ -51,3 +51,11 @@ def test_failure_rolls_back_every_script(sql_dir, conn):
 def test_rejects_scripts_not_in_the_bundle(sql_dir, name):
     with pytest.raises(ValueError):
         db_admin.handler({"scripts": [name]}, None)
+
+
+def test_returns_rows_from_the_last_statement(sql_dir, conn):
+    (sql_dir / "check.sql").write_text("select 1 as n, 'x' as label;")
+
+    result = db_admin.handler({"scripts": ["check.sql"]}, None)
+
+    assert result["rows"] == [{"n": 1, "label": "x"}]

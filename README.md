@@ -115,6 +115,35 @@ source and board to a display name, and a warn-level test flags boards missing f
 Salary periods are normalised to year/month/week/day/hour by the `pay_interval` macro.
 Rippling lists several tiered pay ranges per posting; staging keeps the first USD range.
 
+## RDS
+
+`infra/network.sh` creates the `datatrace` VPC (10.20.0.0/16), two private subnets in
+us-east-2a/b, and three security groups. The VPC has **no internet gateway**, so nothing in it
+can reach or be reached from the internet, which also means no NAT Gateway (~$32/mo) is needed.
+`datatrace-rds` accepts port 5432 only from the `datatrace-api-lambda` and
+`datatrace-pipeline-lambda` groups; rules name those groups rather than IP ranges.
+
+`infra/rds.sh` creates the instance: `db.t4g.micro`, Postgres 17.11, 20 GB gp3 (no autoscaling),
+single-AZ, encrypted, not publicly accessible, IAM auth on, 1-day backups, deletion protection on.
+**It bills about $14/month until deleted.** Backups are short because the raw JSON in S3 is the
+source of truth and the warehouse can be rebuilt from it. The random master password is stored
+in Parameter Store (free; Secrets Manager is $0.40/mo per secret) at
+`/datatrace/rds/master-password`.
+
+## Migrations Lambda
+
+RDS has no public address, so admin SQL can't run from a laptop. `datatrace-db-admin` sits in the
+VPC and applies SQL scripts that ship in its own zip; an invoke may only name a bundled file, never
+supply SQL. All scripts run in one transaction, and rows from a script's last statement come back
+in the response.
+
+    infra/db_admin.sh                                    # applies db_roles.sql
+    infra/db_admin.sh '{"scripts":["check_roles.sql"]}'  # reports what api_reader can do
+
+It connects as the master user, with the password injected as an environment variable at deploy
+time. That is the one credential IAM can't replace: granting a role `rds_iam` requires a password
+login first. Every role it creates uses IAM tokens instead.
+
 ## API role
 
 The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once

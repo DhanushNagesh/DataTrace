@@ -33,10 +33,18 @@ def handler(event, context):
     paths = [resolve(name) for name in scripts]
 
     applied = []
+    rows = None
     # One transaction for all of them: a script that fails halfway leaves the database unchanged
     with connect() as conn:
         for path in paths:
-            conn.execute(path.read_text())
+            cur = conn.execute(path.read_text())
+            # Rows from the last statement come back in the response, so check scripts can
+            # report what the database looks like from inside the VPC
+            if cur.description:
+                rows = [
+                    dict(zip([c.name for c in cur.description], r))
+                    for r in cur.fetchall()
+                ]
             log.info("applied %s", path.name)
             applied.append(path.name)
-    return {"applied": applied}
+    return {"applied": applied, "rows": rows}
