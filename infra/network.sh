@@ -70,11 +70,23 @@ idempotent aws ec2 revoke-security-group-egress --group-id "$RDS_SG" --ip-permis
 idempotent aws ec2 revoke-security-group-egress --group-id "$API_SG" --ip-permissions "$ALL_OUT"
 idempotent aws ec2 authorize-security-group-egress --group-id "$API_SG" --ip-permissions "$(to_group "$RDS_SG")"
 
-# The pipeline group keeps its default outbound rule for now; it also needs S3 over 443, which
-# the S3 gateway endpoint adds in the loader step.
+# The pipeline group keeps its default outbound rule: it needs Postgres and S3 over 443.
+# Gateway endpoint: S3 traffic gets a route inside the VPC, so the loader reaches S3 with no
+# internet gateway and no NAT. Free, and only S3 and DynamoDB have this kind of endpoint.
+S3_ENDPOINT=$(aws ec2 describe-vpc-endpoints \
+  --filters Name=vpc-id,Values="$VPC_ID" Name=service-name,Values="com.amazonaws.${AWS_REGION}.s3" \
+  --query 'VpcEndpoints[0].VpcEndpointId' --output text)
+if [ "$S3_ENDPOINT" = None ]; then
+  S3_ENDPOINT=$(aws ec2 create-vpc-endpoint --vpc-id "$VPC_ID" --vpc-endpoint-type Gateway \
+    --service-name "com.amazonaws.${AWS_REGION}.s3" --route-table-ids "$RTB_ID" \
+    --tag-specifications "$(tags vpc-endpoint datatrace-s3)" \
+    --query VpcEndpoint.VpcEndpointId --output text)
+fi
+
 echo "VPC_ID=$VPC_ID"
 echo "SUBNET_IDS=$SUBNET_A,$SUBNET_B"
 echo "ROUTE_TABLE_ID=$RTB_ID"
 echo "RDS_SG=$RDS_SG"
 echo "API_SG=$API_SG"
 echo "PIPELINE_SG=$PIPELINE_SG"
+echo "S3_ENDPOINT=$S3_ENDPOINT"

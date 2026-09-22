@@ -8,17 +8,13 @@ import logging
 import os
 from pathlib import Path
 
-import psycopg
+from datatrace.db import connect
 
 logging.getLogger().setLevel(logging.INFO)
 log = logging.getLogger("datatrace.db_admin")
 
 SQL_DIR = Path(os.environ.get("DATATRACE_SQL_DIR", "sql"))
 DEFAULT_SCRIPTS = ["db_roles.sql"]
-
-
-def connect() -> psycopg.Connection:
-    return psycopg.connect(os.environ["DATABASE_URL"])
 
 
 def resolve(name: str) -> Path:

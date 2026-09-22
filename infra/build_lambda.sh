@@ -8,6 +8,7 @@ case "$TARGET" in
   ingest)    GROUP=lambda;    EXTRA_SRC=config/boards.toml; EXTRA_DST=config; PLATFORM=aarch64-manylinux2014 ;;
   # psycopg's arm64 wheels need glibc 2.28+; the python3.13 runtime is Amazon Linux 2023 (2.34)
   db-admin)  GROUP=lambda-db; EXTRA_SRC="infra/*.sql";      EXTRA_DST=sql;    PLATFORM=aarch64-manylinux_2_28 ;;
+  load)      GROUP=lambda-db; EXTRA_SRC="";                 EXTRA_DST=.;      PLATFORM=aarch64-manylinux_2_28 ;;
   *) echo "unknown target: $TARGET" >&2; exit 1 ;;
 esac
 
@@ -24,7 +25,7 @@ uv pip install -q -r build/requirements.txt --target "$BUILD" \
 
 cp -R src/datatrace "$BUILD/"
 # shellcheck disable=SC2086
-cp $EXTRA_SRC "$BUILD/$EXTRA_DST/"
+[ -n "$EXTRA_SRC" ] && cp $EXTRA_SRC "$BUILD/$EXTRA_DST/"
 find "$BUILD" -name __pycache__ -type d -prune -exec rm -rf {} +
 
 (cd "$BUILD" && zip -qr -X "../../$ZIP" .)

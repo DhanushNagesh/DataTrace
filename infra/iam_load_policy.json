@@ -1,0 +1,24 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRawOnly",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::datatrace-raw-*/raw/*"
+    },
+    {
+      "Sid": "ListRawPrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::datatrace-raw-*",
+      "Condition": {"StringLike": {"s3:prefix": "raw/*"}}
+    },
+    {
+      "Sid": "LogInAsPipelineRole",
+      "Effect": "Allow",
+      "Action": "rds-db:connect",
+      "Resource": "arn:aws:rds-db:*:*:dbuser:*/datatrace_pipeline"
+    }
+  ]
+}

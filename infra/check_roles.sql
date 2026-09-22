@@ -14,7 +14,8 @@ select
     (select has_schema_privilege(r.rolname, 'marts', 'usage')
      where to_regnamespace('marts') is not null) as can_use_marts,
     has_database_privilege(r.rolname, current_database(), 'connect') as can_connect,
+    has_database_privilege(r.rolname, current_database(), 'create') as can_create,
     (select count(*) from information_schema.tables where table_schema = 'marts') as marts_tables
 from pg_roles r
-where r.rolname in ('api_reader', 'datatrace_admin')
+where r.rolname in ('api_reader', 'datatrace_pipeline', 'datatrace_admin')
 order by r.rolname

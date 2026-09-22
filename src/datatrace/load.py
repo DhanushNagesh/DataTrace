@@ -6,9 +6,9 @@ import os
 import sys
 from pathlib import Path
 
-import psycopg
-from dotenv import load_dotenv
 from psycopg.types.json import Jsonb
+
+from datatrace.db import connect
 
 log = logging.getLogger("datatrace.load")
 
@@ -129,6 +129,14 @@ def load(conn, store) -> dict:
     return summary
 
 
+def handler(event, context):
+    # Same DATATRACE_OUT the ingest Lambda writes to: S3 is the handoff between the two
+    with connect() as conn:
+        summary = load(conn, make_store(os.environ["DATATRACE_OUT"]))
+    log.info("loaded %d runs, %d records", summary["runs"], summary["records"])
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Load finished raw runs into Postgres")
     parser.add_argument(
@@ -141,8 +149,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
+    # CLI only; the Lambda zip ships neither dotenv nor a .env file
+    from dotenv import load_dotenv
+
     load_dotenv()
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+    with connect() as conn:
         summary = load(conn, make_store(args.src))
     log.info("done: %d new runs, %d records", summary["runs"], summary["records"])
     return 0

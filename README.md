@@ -144,6 +144,24 @@ It connects as the master user, with the password injected as an environment var
 time. That is the one credential IAM can't replace: granting a role `rds_iam` requires a password
 login first. Every role it creates uses IAM tokens instead.
 
+## Loader Lambda
+
+`datatrace-load` runs the same `load()` as the CLI, inside the VPC. `infra/loader.sh` builds,
+deploys and invokes it; re-running is a no-op once every manifest is recorded.
+
+It reaches S3 through the S3 **gateway** endpoint (free, added by `infra/network.sh`), which is
+the only kind of endpoint RDS-adjacent work needs — gateway endpoints exist for S3 and DynamoDB
+only, and a Lambda reaches RDS over the VPC with no endpoint at all. It logs in as
+`datatrace_pipeline` with an IAM token that `db.connect()` signs locally, so the function holds no
+database password. Its role may read `raw/` in the bucket and `rds-db:connect` as that one
+database user, nothing else.
+
+Long invokes need `--cli-read-timeout 0`: the CLI's 60s default gives up and retries, which starts
+a second loader run alongside the first. The `raw.job_postings` primary key rejects the duplicate
+copy and that transaction rolls back, so a race costs time, not correctness.
+
+    infra/db_admin.sh '{"scripts":["check_load.sql"]}'   # runs and rows landed so far
+
 ## API role
 
 The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once
