@@ -1,5 +1,6 @@
 {
   "Comment": "Daily pipeline: job boards to S3, S3 to RDS, then dbt. Each step waits for the one before it.",
+  "TimeoutSeconds": 3600,
   "StartAt": "Ingest",
   "States": {
     "Ingest": {
