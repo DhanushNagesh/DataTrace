@@ -57,6 +57,7 @@ sg() {
 }
 RDS_SG=$(sg datatrace-rds "Postgres, reachable only from DataTrace Lambda security groups")
 API_SG=$(sg datatrace-api-lambda "API Lambda, may only open connections to Postgres")
+PIPELINE_SG=$(sg datatrace-pipeline-lambda "Migration, loader and dbt Lambdas: Postgres and S3")
 
 # Rules name the other security group, not an IP range: only ENIs carrying that group match.
 # Security groups are stateful, so replies need no rule of their own.
@@ -64,12 +65,16 @@ to_group() { echo "IpProtocol=tcp,FromPort=5432,ToPort=5432,UserIdGroupPairs=[{G
 ALL_OUT='IpProtocol=-1,IpRanges=[{CidrIp=0.0.0.0/0}]'
 
 idempotent aws ec2 authorize-security-group-ingress --group-id "$RDS_SG" --ip-permissions "$(to_group "$API_SG")"
+idempotent aws ec2 authorize-security-group-ingress --group-id "$RDS_SG" --ip-permissions "$(to_group "$PIPELINE_SG")"
 idempotent aws ec2 revoke-security-group-egress --group-id "$RDS_SG" --ip-permissions "$ALL_OUT"
 idempotent aws ec2 revoke-security-group-egress --group-id "$API_SG" --ip-permissions "$ALL_OUT"
 idempotent aws ec2 authorize-security-group-egress --group-id "$API_SG" --ip-permissions "$(to_group "$RDS_SG")"
 
+# The pipeline group keeps its default outbound rule for now; it also needs S3 over 443, which
+# the S3 gateway endpoint adds in the loader step.
 echo "VPC_ID=$VPC_ID"
 echo "SUBNET_IDS=$SUBNET_A,$SUBNET_B"
 echo "ROUTE_TABLE_ID=$RTB_ID"
 echo "RDS_SG=$RDS_SG"
 echo "API_SG=$API_SG"
+echo "PIPELINE_SG=$PIPELINE_SG"

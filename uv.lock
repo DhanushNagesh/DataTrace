@@ -408,6 +408,9 @@ dev = [
 lambda = [
     { name = "requests" },
 ]
+lambda-db = [
+    { name = "psycopg", extra = ["binary"] },
+]
 
 [package.metadata]
 requires-dist = [
@@ -426,6 +429,7 @@ dev = [
     { name = "ruff", specifier = ">=0.16.8" },
 ]
 lambda = [{ name = "requests", specifier = ">=2.34.2" }]
+lambda-db = [{ name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" }]
 
 [[package]]
 name = "dbt-adapters"

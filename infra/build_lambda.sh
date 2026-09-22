@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# Builds dist/ingest.zip for the python3.13 arm64 Lambda runtime.
+# Builds a Lambda zip for the python3.13 arm64 runtime.
+# Usage: infra/build_lambda.sh [ingest|db-admin]
 set -euo pipefail
 
+TARGET="${1:-ingest}"
+case "$TARGET" in
+  ingest)    GROUP=lambda;    EXTRA_SRC=config/boards.toml; EXTRA_DST=config; PLATFORM=aarch64-manylinux2014 ;;
+  # psycopg's arm64 wheels need glibc 2.28+; the python3.13 runtime is Amazon Linux 2023 (2.34)
+  db-admin)  GROUP=lambda-db; EXTRA_SRC="infra/*.sql";      EXTRA_DST=sql;    PLATFORM=aarch64-manylinux_2_28 ;;
+  *) echo "unknown target: $TARGET" >&2; exit 1 ;;
+esac
+
 cd "$(dirname "$0")/.."
-BUILD=build/lambda
-rm -rf "$BUILD" dist/ingest.zip
-mkdir -p "$BUILD" dist
+BUILD="build/lambda-$TARGET"
+ZIP="dist/$TARGET.zip"
+rm -rf "$BUILD" "$ZIP"
+mkdir -p "$BUILD/$EXTRA_DST" dist
 
 # Versions come from uv.lock so the zip matches what the tests ran against
-uv export --only-group lambda --no-hashes --format requirements.txt -q -o build/requirements.txt
+uv export --only-group "$GROUP" --no-hashes --format requirements.txt -q -o build/requirements.txt
 uv pip install -q -r build/requirements.txt --target "$BUILD" \
-  --python-platform aarch64-manylinux2014 --python-version 3.13 --only-binary :all:
+  --python-platform "$PLATFORM" --python-version 3.13 --only-binary :all:
 
 cp -R src/datatrace "$BUILD/"
-mkdir -p "$BUILD/config"
-cp config/boards.toml "$BUILD/config/"
+# shellcheck disable=SC2086
+cp $EXTRA_SRC "$BUILD/$EXTRA_DST/"
 find "$BUILD" -name __pycache__ -type d -prune -exec rm -rf {} +
 
-(cd "$BUILD" && zip -qr -X ../../dist/ingest.zip .)
-ls -lh dist/ingest.zip
+(cd "$BUILD" && zip -qr -X "../../$ZIP" .)
+ls -lh "$ZIP"

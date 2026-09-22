@@ -21,6 +21,10 @@ dev = [
 lambda = [
     "requests>=2.34.2",
 ]
+# Runtime deps for the in-VPC Lambdas that talk to Postgres. psycopg[binary] ships its own libpq.
+lambda-db = [
+    "psycopg[binary]>=3.3.5",
+]
 
 [project.scripts]
 datatrace-ingest = "datatrace.ingest:main"
