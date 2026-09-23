@@ -16,13 +16,13 @@ later the dashboard is showing the new day's numbers.
 
 Live at **[datatrace-gamma.vercel.app](https://datatrace-gamma.vercel.app/)**.
 
-![DataTrace homepage — headline stat tiles and the role mix chart](docs/images/home.png)
+![DataTrace /intelligence — headline stat tiles and the role mix chart](docs/images/home.png)
 
-*The homepage: headline counts, then role mix — the first of five server-rendered sections.*
+*`/intelligence`: headline counts, then role mix — the first of five server-rendered sections.*
 
 ![The postings page — filtered posting list with facet popovers](docs/images/postings.png)
 
-*`/postings`: every filter lives in the URL, so a filtered view is shareable.*
+*`/postings`, the front door: every filter lives in the URL, so a filtered view is shareable.*
 
 ## Architecture
 
@@ -387,10 +387,14 @@ echo 'DATATRACE_API_URL=<the URL infra/api.sh printed>' > .env.local
 npm run dev
 ```
 
-`/` is statically prerendered with `revalidate: 300`, matching the `cache-control` the
-Lambda sends. One visitor's request warms it and everyone else that five minutes is served
-from the edge cache, so a burst of traffic is a handful of Lambda invocations rather than
-one per visitor. The data changes once a day, so nothing is ever meaningfully stale.
+`/` redirects to `/postings`: the roles list is the front door, and the charts sit one click
+away at `/intelligence`.
+
+`/intelligence` is statically prerendered. Every API fetch sets `revalidate: 300`
+(`web/lib/api.ts`), matching the `cache-control` the Lambda sends. One visitor's request
+warms it and everyone else that five minutes is served from the edge cache, so a burst of
+traffic is a handful of Lambda invocations rather than one per visitor. The data changes
+once a day, so nothing is ever meaningfully stale.
 
 `/postings` is dynamic because its filters live in the URL. The free-text fields are a plain
 GET `<form>` and each facet is a popover of server-built `<Link>`s, so every filtered view is
