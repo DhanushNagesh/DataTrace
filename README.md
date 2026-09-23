@@ -12,9 +12,9 @@ later the dashboard is showing the new day's numbers.
 
 ## The dashboard
 
-![DataTrace homepage — headline stats and the role mix, seniority, pay, time-to-close and daily flow sections](docs/images/home.png)
+![DataTrace homepage — headline stat tiles and the role mix chart](docs/images/home.png)
 
-*The homepage: headline counts and the five chart sections, all server-rendered.*
+*The homepage: headline counts, then role mix — the first of five server-rendered sections.*
 
 ![The postings page — filtered posting list with facet popovers](docs/images/postings.png)
 
