@@ -1,5 +1,7 @@
 # DataTrace
 
+**[Live site](https://datatrace-gamma.vercel.app/)** · **[Tableau dashboard](https://public.tableau.com/app/profile/dhanush.nagesh/viz/DataTraceUSTechJobPostings/Dashboard1)**
+
 DataTrace collects software and data job postings from public job board APIs every
 morning, keeps every raw response in S3, models them in Postgres with dbt, and serves
 the results through a read-only API to a Next.js dashboard. It answers the questions a
@@ -11,6 +13,8 @@ starts a Step Functions execution at 06:00 Pacific, and about four and a half mi
 later the dashboard is showing the new day's numbers.
 
 ## The dashboard
+
+Live at **[datatrace-gamma.vercel.app](https://datatrace-gamma.vercel.app/)**.
 
 ![DataTrace homepage — headline stat tiles and the role mix chart](docs/images/home.png)
 
@@ -418,6 +422,8 @@ On Vercel, set the project's Root Directory to `web` and add `DATATRACE_API_URL`
 three environments.
 
 ## Tableau
+
+Published at **[public.tableau.com/…/DataTraceUSTechJobPostings](https://public.tableau.com/app/profile/dhanush.nagesh/viz/DataTraceUSTechJobPostings/Dashboard1)**.
 
 Tableau Public can't connect to Postgres, so the workbook reads a CSV extract of
 `marts.rpt_postings` — one row per posting with display labels, `company_name`, annualised
