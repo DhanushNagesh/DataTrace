@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 const NAV = [
   { href: "/postings", label: "Roles" },
-  { href: "/", label: "Intelligence" },
+  { href: "/intelligence", label: "Intelligence" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-body antialiased">
         <header className="sticky top-0 z-40 border-b-[3px] border-rule bg-paper">
           <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-8 gap-y-2 px-5 py-3">
-            <Link href="/" className="font-display text-3xl leading-none tracking-tight">
+            <Link href="/postings" className="font-display text-3xl leading-none tracking-tight">
               DataTrace
             </Link>
             <nav className="flex items-center gap-6">
