@@ -97,6 +97,11 @@ models:
     columns:
       - name: open_postings
         data_tests: [not_null]
+      - name: new_this_week
+        description: >
+          Open postings the board published in the last seven days. Counts published_at, not
+          first_seen_at, which only records when our ingest first saw the row.
+        data_tests: [not_null]
       - name: data_as_of
         data_tests: [not_null]
 

@@ -22,7 +22,7 @@ parsed as (
         payload->'salaryRange'->>'interval' as salary_interval,
         payload->>'hostedUrl' as url,
         payload->>'description' as description_html,
-        to_timestamp((payload->>'createdAt')::bigint / 1000.0) as published_at,
+        to_timestamp((payload->>'createdAt')::bigint / 1000.0) as created_at,
         ingested_at as observed_at
     from src
 )
@@ -48,7 +48,17 @@ select
     {{ pay_interval('salary_interval') }} as salary_interval,
     url,
     description_html,
-    published_at,
+    -- createdAt is the only date Lever's payload carries, and on a board that migrated onto
+    -- Lever the old requisitions were backfilled with a date but no time: every Palantir
+    -- createdAt before 2015 lands on exactly 00:00:00 UTC, every one after it carries a real
+    -- time. Those are migration stamps rather than publish dates, and one of them reaches the
+    -- marts as a 4,600-day listing, so they are dropped and published_at falls back to
+    -- first_seen_at downstream. Same idea as the 15k-1M salary band in rpt_postings: a value
+    -- outside the plausible shape means the field is holding something other than what it says.
+    case
+        when created_at >= '2015-01-01'::timestamptz then created_at
+        when created_at::time <> '00:00:00' then created_at
+    end as published_at,
     null::timestamptz as source_updated_at,
     observed_at
 from parsed
