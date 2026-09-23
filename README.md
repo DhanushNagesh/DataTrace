@@ -1,337 +1,435 @@
 # DataTrace
 
-A job market analytics pipeline that pulls postings from public job board APIs, lands them in S3, models them in Postgres with dbt, and serves them through a read-only API to a Next.js dashboard.
+DataTrace collects software and data job postings from public job board APIs every
+morning, keeps every raw response in S3, models them in Postgres with dbt, and serves
+the results through a read-only API to a Next.js dashboard. It answers the questions a
+job seeker actually has — which role families are hiring, what they pay, how fast
+postings close — from ~11k open US postings across 76 company boards.
 
-Python ingestion → AWS Lambda (EventBridge) → S3 → RDS Postgres → dbt → API Gateway → Next.js on Vercel (and a Tableau Public extract)
+Everything runs on a schedule with no machine of mine involved: one EventBridge trigger
+starts a Step Functions execution at 06:00 Pacific, and about four and a half minutes
+later the dashboard is showing the new day's numbers.
 
-Sources: public job board APIs from Greenhouse, Lever, Ashby, SmartRecruiters and Rippling (company
-boards listed in `config/boards.toml`), plus the RemoteOK feed. Scope: US-accessible postings,
-filtered in dbt staging.
+## Architecture
 
-SmartRecruiters and Rippling list endpoints leave out the job description, so each posting needs
-its own detail request. `http.get_many` runs those 8 at a time, and a posting that 404s between
-the list and detail calls is skipped. Rippling's list repeats a job once per location; the
-source merges those before fetching details.
+```
+DAILY RUN  —  06:00 America/Los_Angeles, one Step Functions execution, ~4.5 min
 
-## Local setup
+   76 company boards        ┌──────────┐      ┌──────────┐      ┌──────────────┐
+   6 public APIs      ───►  │  ingest  │ ───► │   load   │ ───► │     dbt      │
+                            │  Lambda  │      │  Lambda  │      │  Lambda      │
+                            │  (zip)   │      │  (zip)   │      │  (container) │
+                            └──────────┘      └──────────┘      └──────────────┘
+                                  │                 │                   │
+                                  ▼                 ▼                   ▼
+                             S3 raw JSON  ───► raw.job_postings ─► staging ─► marts
+                          (source of truth)    RDS Postgres 17, private VPC
 
-Keep the repo out of iCloud-synced folders (`~/Documents`, `~/Desktop`). iCloud sets the
-macOS `hidden` flag on dot-named files it syncs, and Python 3.13+ skips hidden `.pth`
-files, so the venv's editable install silently stops importing `datatrace`. It also
-syncs `.git`, which risks corrupting the repo. This repo lives in `~/code/DataTrace`.
+READ PATH
 
-    uv sync
+   marts ───► API Lambda ───► HTTP API Gateway ───► Next.js on Vercel
+     │        (api_reader,     (throttled,           (server components,
+     │         read-only)       5 min cache)          5 min revalidate)
+     │
+     └──────► CSV extract ───► Tableau Public
+```
 
-## AWS setup
+The three pipeline stages run inside a VPC with **no internet gateway**, so nothing in it
+can reach or be reached from the internet. S3 is read through a free gateway endpoint, and
+the API Lambda is the only thing exposed, behind API Gateway.
 
-The account is on the AWS (new) free plan, where work happens in a project
-account (264350941264) reached through a login session, not IAM user keys. An
-AWS-managed SCP limits the account to **us-east-2**: Lambda, Scheduler, RDS and
-S3 bucket creation are denied in every other region.
+Raw JSON in S3 is the source of truth. The warehouse is disposable — if RDS is lost, a
+reload and a `dbt build` rebuild it from the bucket, which is why backups are kept to a
+single day.
 
-    aws login --profile datatrace
-    export AWS_PROFILE=datatrace AWS_REGION=us-east-2
+## Stack
 
-`infra/s3_raw_bucket.sh` creates and configures `datatrace-raw-<account>-<region>`.
-Ingest to S3 with:
+| Layer | What it uses |
+|---|---|
+| Ingestion | Python 3.13, `requests`, a source module per board API |
+| Raw landing | S3, newline-delimited JSON plus a run manifest |
+| Warehouse | RDS Postgres 17 (`db.t4g.micro`, private, IAM auth) |
+| Transformation | dbt (dbt-postgres), staging views → mart tables, seeds and tests |
+| Orchestration | Step Functions Standard, triggered by EventBridge Scheduler |
+| Compute | Lambda — three zips (arm64, python3.13) and one container image from ECR |
+| API | Lambda + API Gateway **HTTP API**, `psycopg` |
+| Frontend | Next.js App Router (React Server Components), Recharts, on Vercel |
+| BI | Tableau Public, reading a CSV extract |
+| Secrets & auth | IAM database auth, Parameter Store, per-function IAM roles |
+| Monitoring | CloudWatch alarms → SNS email, AWS Budgets |
+| Tooling | uv, pytest (46 tests), ruff, Docker Compose for local Postgres |
 
-    uv run datatrace-ingest --out s3://datatrace-raw-264350941264-us-east-2/raw
+## Sources and scope
 
-`botocore[crt]` is a dev dependency because boto3 needs it to read `aws login`
-credentials; Lambda uses its execution role instead.
+Public JSON APIs from **Greenhouse** (54 boards), **Ashby** (12), **Lever** (5),
+**SmartRecruiters** (4) and **Rippling** (1), plus the **RemoteOK** feed. Boards are
+listed in `config/boards.toml` and were picked for US-heavy postings across tech,
+fintech, healthcare, consumer, gaming and hardware.
 
-## Lambda
+Scope is US-accessible postings. Raw data lands unfiltered and the US filter happens in
+dbt staging, so changing the definition is a rebuild, not a re-ingest. Workday, iCIMS and
+Oracle are out of scope — no clean public API — and nothing scrapes LinkedIn or Indeed.
 
-`datatrace.lambda_handler.handler` wraps the same `run()` as the CLI. It reads
-`DATATRACE_OUT` for the destination and accepts an optional
-`{"sources": [...]}` event for test invokes. Build the arm64 / python3.13 zip
-(requests + the package + `config/boards.toml`, about 650K) with:
+Two source quirks the ingestion handles. SmartRecruiters and Rippling omit the
+description from their list endpoints, so each posting needs its own detail request;
+`http.get_many` runs those 8 at a time and skips a posting that 404s between the list and
+detail calls. Rippling repeats a job once per location, so the source merges those before
+fetching details.
 
-    infra/build_lambda.sh
+## Layout
 
-The function `datatrace-ingest` (us-east-2, python3.13 arm64, 512 MB, 5 min
-timeout, async retries 0) runs as `datatrace-ingest-lambda`, which can only put
-objects under `raw/` and write its own log group. Deploy a new build with:
+```
+src/datatrace/     ingestion, loader, dbt and API Lambda handlers
+  sources/         one module per board API
+config/            boards.toml — the company board list
+dbt/               staging and mart models, macros, seeds, tests
+infra/             one shell script per AWS component, all safe to re-run
+web/               Next.js frontend (Vercel's root directory)
+tests/             pytest
+```
 
-    aws lambda update-function-code --function-name datatrace-ingest --zip-file fileb://dist/ingest.zip
+## Running it locally
 
-A full run takes about 3.5 minutes, most of it the ~2,000 SmartRecruiters detail requests. EventBridge Scheduler
-(`datatrace-ingest-daily`) invokes it at 06:00 America/Los_Angeles with no
-retries, using the `datatrace-scheduler` role, which can only invoke this function.
+```
+uv sync
+docker compose up -d                  # Postgres 17 for dbt development
+cp .env.example .env
+uv run datatrace-load --src data/raw
+cd dbt && uv run dbt build
+```
 
-`infra/alarms.sh [email]` sets up email alerts through the `datatrace-alerts` SNS topic (the
-address is only needed the first time; it is already subscribed):
+dbt development runs against Docker Postgres, not RDS, so iterating on models costs
+nothing and RDS only comes up once the models work. Create the read-only API role once per
+database, before the first build:
 
-- `datatrace-ingest-errors`: the ingest Lambda crashed or timed out.
-- `datatrace-ingest-source-failures`: a board failed, counted from the logs by a metric filter.
-  The run manifest says which.
-- `datatrace-pipeline-failed`: an execution failed, timed out or was aborted, as one alarm over
-  the sum of all three metrics. The state machine also publishes the failing state itself.
-- `datatrace-pipeline-missed`: no execution started in 24h, treating missing data as breaching.
-  A failing pipeline is loud; a pipeline that never starts is silent, and this is what catches it.
+```
+docker compose exec -T postgres psql -U datatrace -d datatrace -v ON_ERROR_STOP=1 < infra/db_roles.sql
+```
 
-The state machine has a one-hour `TimeoutSeconds`, so a hung run ends and counts as timed out
-instead of blocking the next day's. Four alarms; CloudWatch bills after ten.
+Tests use a separate `datatrace_test` database and skip the loader tests when Postgres
+isn't running:
 
-## Local warehouse
+```
+uv run pytest
+uv run ruff check src tests
+```
 
-dbt development runs against Postgres 17 in Docker, not RDS, so iterating on
-models costs nothing. RDS only comes up once the models work.
+One local gotcha: keep the repo out of iCloud-synced folders (`~/Documents`, `~/Desktop`).
+iCloud sets the macOS `hidden` flag on dot-named files it syncs, Python 3.13+ skips hidden
+`.pth` files, and the venv's editable install silently stops importing `datatrace`. It also
+syncs `.git`, which risks corrupting the repo.
 
-    docker compose up -d
-    cp .env.example .env
-    uv run datatrace-load --src data/raw
-    uv run datatrace-load --src s3://datatrace-raw-264350941264-us-east-2/raw
+## The warehouse
 
-`datatrace-load` finds run manifests that have not been loaded yet and copies
-each run's records into `raw.job_postings` (one row per posting, payload as
-`jsonb`) in a single transaction, then records the manifest in `raw.loaded_runs`.
-Rerunning is a no-op, and a run that fails partway leaves nothing behind.
-`uv run pytest` uses a separate `datatrace_test` database and skips the loader
-tests when Postgres is not running.
+`profiles.yml` sits next to the dbt project, with a `dev` target on Docker Postgres and a
+`prod` target on RDS reading `DBT_HOST`, `DBT_USER` and `DBT_PASSWORD` from the environment.
 
-## dbt
+**Staging** (views). `stg_<source>__postings` gives one typed row per posting per ingest
+run, all countries, with an `is_us` flag. `stg_job_postings` unions them and filters to
+US-accessible postings: a US location, or remote with no region stated.
 
-The dbt project lives in `dbt/`. `profiles.yml` sits next to it, with a `dev` target
-pointing at the Docker Postgres and a `prod` target (RDS) that reads `DBT_HOST`,
-`DBT_USER` and `DBT_PASSWORD` from the environment.
+**Marts** (tables).
 
-    cd dbt
-    uv run dbt build              # dev
-    uv run dbt build --target prod
+| Model | Grain |
+|---|---|
+| `fct_job_postings` | one row per US posting, latest attributes, `days_listed`, `is_active` |
+| `dim_companies` | one row per company, keyed on md5 of the normalized name |
+| `rpt_postings` | the display-ready posting list, labels and USD pay resolved |
+| `rpt_stats` | one row: headline counts and the freshness stamp |
+| `rpt_role_mix`, `rpt_seniority_mix` | share of open postings by family, and within it |
+| `rpt_salary_by_role` | p25 / median / p75 annualised USD pay |
+| `rpt_time_to_close`, `rpt_daily_flow` | median and p90 days listed; daily open/opened/closed |
 
-- `staging.stg_<source>__postings` (views): one typed row per posting per ingest
-  run, all countries, with an `is_us` flag.
-- `staging.stg_job_postings`: the union of those, filtered to US-accessible postings:
-  a US location, or remote with no region stated (`is_remote_anywhere`). This is where the US filter happens.
-- `marts.fct_job_postings` (table): one row per US-accessible posting with its latest attributes,
-  `first_seen_at`/`last_seen_at`, `days_listed`, and `is_active`, meaning it was seen in the latest
-  run that returned its board, so a board outage doesn't mark its postings closed. `is_active` is
-  null for RemoteOK, whose feed is a rolling window of recent jobs rather than a list of open ones.
-- `marts.dim_companies` (table): one row per company, joined on `company_key` (md5 of the
-  normalized name), so the same company across sources is one row.
-- `marts.rpt_stats`, `rpt_role_mix`, `rpt_seniority_mix`, `rpt_salary_by_role`, `rpt_time_to_close`,
-  `rpt_daily_flow` (tables): small pre-aggregated marts, one per dashboard section — one row for
-  `rpt_stats`, tens to a few hundred for the rest — so the API serves each with a plain `select *`
-  instead of aggregating 11k postings on every request. Rebuilt once a day by dbt, like every other mart.
+The `rpt_*` marts are small — one row for `rpt_stats`, tens to a few hundred for the rest
+— and each is already the shape a dashboard section needs. That's the point: the API serves
+every one of them with a plain `select *` instead of aggregating 11k postings per request,
+and the aggregation happens once a day in dbt.
 
-Display labels (`Data Engineering`, `Staff+`) and the seniority sort order come from the
-`role_family_label`, `seniority_label` and `seniority_rank` macros. Every mart calls them, so a
-section built on `fct_job_postings` labels a family exactly as one built on `rpt_postings` does —
-otherwise four of the five sections would serve raw `data_engineering` while the fifth served
-`Data Engineering`, and nothing could cross-filter.
+`is_active` means a posting was seen in the latest run that returned *its* board, so one
+board's outage doesn't mark its postings closed. It's null for RemoteOK, whose feed is a
+rolling window of recent jobs rather than a list of open ones.
 
-US classification: Lever, Ashby, SmartRecruiters and Rippling carry country fields. Greenhouse
-and RemoteOK only have free text, so they go through the `is_us_location` macro (regex over country names,
-state names/codes and major cities). `seeds/us_location_cases.csv` holds
-hand-labelled locations, and `tests/assert_us_location_cases.sql` fails if the macro
-gets any of them wrong. A Greenhouse posting whose location is just "Remote" or "N/A"
-falls back to its `offices` list. A bare "Remote", "Worldwide", or blank RemoteOK location
-counts as remote-anywhere, which is treated as US-accessible.
+### Modeling decisions worth knowing
 
-Lever and Ashby have no company name in their APIs; `seeds/board_companies.csv` maps
-source and board to a display name, and a warn-level test flags boards missing from it.
-Salary periods are normalised to year/month/week/day/hour by the `pay_interval` macro.
-Rippling lists several tiered pay ranges per posting; staging keeps the first USD range.
+**Dates.** `first_seen_at` is when ingestion first saw a row, not when the role went up.
+Anything user-facing that means "posted" reads `published_at`, the board's own date,
+falling back to `first_seen_at` only where a source gives none. This matters more than it
+sounds: counted on `first_seen_at`, a young warehouse makes every posting look new and the
+"new this week" headline read 11,285 of 11,285. Lever publish dates that are actually ATS
+migration stamps are dropped in staging — they made real postings look like 4,600-day
+listings — and `assert_no_migration_stamp_dates.sql` fails the build if the pattern shows
+up in another source.
 
-## RDS
+**US classification.** Lever, Ashby, SmartRecruiters and Rippling carry country fields.
+Greenhouse and RemoteOK only have free text, so they go through the `is_us_location` macro
+(regex over country names, state names and codes, and major cities). `seeds/us_location_cases.csv`
+holds hand-labelled locations and a test fails the build if the macro gets any of them
+wrong. A Greenhouse posting whose location is just "Remote" or "N/A" falls back to its
+`offices` list; a bare "Remote", "Worldwide" or blank RemoteOK location counts as
+remote-anywhere, which is treated as US-accessible.
 
-`infra/network.sh` creates the `datatrace` VPC (10.20.0.0/16), two private subnets in
-us-east-2a/b, and three security groups. The VPC has **no internet gateway**, so nothing in it
-can reach or be reached from the internet, which also means no NAT Gateway (~$32/mo) is needed.
-`datatrace-rds` accepts port 5432 only from the `datatrace-api-lambda` and
-`datatrace-pipeline-lambda` groups; rules name those groups rather than IP ranges.
+**Shared labels.** Display labels (`Data Engineering`, `Staff+`) and the seniority sort
+order come from the `role_family_label`, `seniority_label` and `seniority_rank` macros, and
+every mart calls them. Without that, four of the five dashboard sections would serve raw
+`data_engineering` while the fifth served `Data Engineering`, and nothing could cross-filter.
 
-`infra/rds.sh` creates the instance: `db.t4g.micro`, Postgres 17.11, 20 GB gp3 (no autoscaling),
-single-AZ, encrypted, not publicly accessible, IAM auth on, 1-day backups, deletion protection on.
-**It bills about $14/month until deleted.** Backups are short because the raw JSON in S3 is the
-source of truth and the warehouse can be rebuilt from it. The random master password is stored
-in Parameter Store (free; Secrets Manager is $0.40/mo per secret) at
-`/datatrace/rds/master-password`.
+**Company names.** Lever and Ashby put no company name in their APIs, so
+`seeds/board_companies.csv` maps source and board to a display name and a warn-level test
+flags boards missing from it. Salary periods are normalised by the `pay_interval` macro;
+Rippling lists several tiered ranges per posting and staging keeps the first USD one.
 
-## Migrations Lambda
+## AWS
 
-RDS has no public address, so admin SQL can't run from a laptop. `datatrace-db-admin` sits in the
-VPC and applies SQL scripts that ship in its own zip; an invoke may only name a bundled file, never
-supply SQL. All scripts run in one transaction, and rows from a script's last statement come back
-in the response.
+The account is on the AWS (new) free plan, so work happens in a project account
+(264350941264) reached through a login session rather than IAM user keys. An AWS-managed
+SCP limits the account to **us-east-2** — Lambda, Scheduler, RDS and S3 bucket creation are
+denied everywhere else.
 
-    infra/db_admin.sh                                    # applies db_roles.sql
-    infra/db_admin.sh '{"scripts":["check_roles.sql"]}'  # reports what api_reader can do
+```
+aws login --profile datatrace
+export AWS_PROFILE=datatrace AWS_REGION=us-east-2
+```
 
-It connects as the master user, with the password injected as an environment variable at deploy
-time. That is the one credential IAM can't replace: granting a role `rds_iam` requires a password
-login first. Every role it creates uses IAM tokens instead.
+Every script in `infra/` is safe to re-run.
 
-## Loader Lambda
+| Script | What it builds |
+|---|---|
+| `s3_raw_bucket.sh` | the raw landing bucket |
+| `network.sh` | VPC, two private subnets, security groups, S3 gateway endpoint |
+| `rds.sh` | the Postgres instance |
+| `build_lambda.sh` | the ingest zip |
+| `loader.sh` | build, deploy and invoke the loader |
+| `dbt.sh` | build the image, push to ECR, run `dbt build` against prod |
+| `api.sh [origin]` | API Lambda plus the Gateway routes |
+| `pipeline.sh` | the state machine, and repoints the schedule at it |
+| `db_admin.sh` | run a bundled SQL script inside the VPC |
+| `alarms.sh`, `budget.sh` | CloudWatch alarms and the monthly budget |
 
-`datatrace-load` runs the same `load()` as the CLI, inside the VPC. `infra/loader.sh` builds,
-deploys and invokes it; re-running is a no-op once every manifest is recorded.
+### Ingest
 
-It reaches S3 through the S3 **gateway** endpoint (free, added by `infra/network.sh`), which is
-the only kind of endpoint RDS-adjacent work needs — gateway endpoints exist for S3 and DynamoDB
-only, and a Lambda reaches RDS over the VPC with no endpoint at all. It logs in as
-`datatrace_pipeline` with an IAM token that `db.connect()` signs locally, so the function holds no
-database password. Its role may read `raw/` in the bucket and `rds-db:connect` as that one
-database user, nothing else.
+`datatrace.lambda_handler.handler` wraps the same `run()` as the CLI, reading
+`DATATRACE_OUT` for the destination and accepting an optional `{"sources": [...]}` event
+for test invokes. The zip is about 650K — `requests`, the package and `boards.toml` —
+and runs on python3.13 arm64 with 512 MB and a 5 minute timeout. A full run takes about
+3.5 minutes, most of it the ~2,000 SmartRecruiters detail requests.
 
-Long invokes need `--cli-read-timeout 0`: the CLI's 60s default gives up and retries, which starts
-a second loader run alongside the first. The `raw.job_postings` primary key rejects the duplicate
-copy and that transaction rolls back, so a race costs time, not correctness.
+```
+uv run datatrace-ingest --out s3://datatrace-raw-264350941264-us-east-2/raw
+infra/build_lambda.sh
+aws lambda update-function-code --function-name datatrace-ingest --zip-file fileb://dist/ingest.zip
+```
 
-    infra/db_admin.sh '{"scripts":["check_load.sql"]}'   # runs and rows landed so far
+`botocore[crt]` is a dev dependency because boto3 needs it to read `aws login` credentials;
+in Lambda the execution role handles that instead.
 
-## dbt Lambda
+### Load
 
-dbt-postgres is far past the 250 MB zip limit, so `datatrace-dbt` ships as a container image
-(`infra/dbt.Dockerfile`, pushed to ECR by `infra/dbt.sh`; a lifecycle policy keeps the last two
-images, about $0.25/month). The dbt project is baked into the image, and an invoke may only pick a
-command from `dbt_handler.ALLOWED` — `run-operation` is excluded, since it would run arbitrary SQL
-as the owner of every table.
+`datatrace-load` runs the same `load()` as the CLI, inside the VPC. It finds run manifests
+that haven't been loaded yet and copies each run's records into `raw.job_postings` (one row
+per posting, payload as `jsonb`) in a single transaction, then records the manifest in
+`raw.loaded_runs`. Rerunning is a no-op and a run that fails partway leaves nothing behind.
 
-    infra/dbt.sh                          # dbt build against the prod (RDS) target
-    infra/dbt.sh '{"command":["test"]}'
+It logs in as `datatrace_pipeline` with an IAM token that `db.connect()` signs locally, so
+the function holds no database password, and its role may read `raw/` in the bucket and
+`rds-db:connect` as that one user, nothing else.
 
-`profiles.yml`'s prod target reads `DBT_HOST`/`DBT_USER`/`DBT_PASSWORD`; the handler fills them from
-`DB_HOST`/`DB_USER` and an IAM token, so dbt logs in as `datatrace_pipeline` with no password.
+Long invokes need `--cli-read-timeout 0`: the CLI's 60s default gives up and retries, which
+starts a second loader run alongside the first. The `raw.job_postings` primary key rejects
+the duplicate and that transaction rolls back, so a race costs time, not correctness.
+
+### dbt
+
+dbt-postgres is far past the 250 MB zip limit, so `datatrace-dbt` ships as a container
+image (`infra/dbt.Dockerfile`, pushed to ECR with a lifecycle policy keeping the last two
+images). The project is baked into the image, and an invoke may only pick a command from
+`dbt_handler.ALLOWED` — `run-operation` is excluded, since it would run arbitrary SQL as
+the owner of every table.
+
+```
+infra/dbt.sh                          # dbt build against prod
+infra/dbt.sh '{"command":["test"]}'
+```
 
 Three things Lambda forces on dbt, all handled in `dbt_handler`:
 
-- No `/dev/shm`, so POSIX semaphores fail. dbt's mp context and its `DbtThreadPool`
-  (a `multiprocessing.pool.ThreadPool`) are swapped for thread locks and a `ThreadPoolExecutor`.
-  dbt runs nodes in threads anyway. Both patches must happen before `dbt.cli.main` is imported.
-- Only `/tmp` is writable: `DBT_LOG_PATH` and `DBT_TARGET_PATH` point there.
-- Lambda rejects the OCI image index that buildx produces by default, hence
+- No `/dev/shm`, so POSIX semaphores fail. dbt's mp context and its `DbtThreadPool` are
+  swapped for thread locks and a `ThreadPoolExecutor` — dbt runs nodes in threads anyway.
+  Both patches have to happen before `dbt.cli.main` is imported.
+- Only `/tmp` is writable, so `DBT_LOG_PATH` and `DBT_TARGET_PATH` point there.
+- Lambda rejects the OCI image index buildx produces by default, hence
   `--provenance=false --sbom=false`.
 
-Prod runs two threads, not four: on db.t4g.micro four parallel connections exhausted the instance's
-CPU credits and later connections timed out mid-build.
+Prod runs two threads, not four: on `db.t4g.micro`, four parallel connections exhausted the
+instance's CPU credits and later connections timed out mid-build.
 
-## Daily pipeline
+### Database and admin access
 
-`infra/pipeline.sh` builds the `datatrace-pipeline` state machine: ingest, then load, then dbt,
-each waiting for the one before it. The existing `datatrace-ingest-daily` schedule now starts the
-state machine instead of invoking the ingest Lambda directly, so there is still one trigger at
-06:00 America/Los_Angeles. Any step that fails publishes the execution state to the
-`datatrace-alerts` topic and ends the run as failed. Step Functions Standard is free here
-(~120 of the 4,000 free monthly state transitions).
+`network.sh` creates the `datatrace` VPC (10.20.0.0/16) with two private subnets in
+us-east-2a/b. With no internet gateway there's also no need for a NAT Gateway (~$32/mo).
+`datatrace-rds` accepts 5432 only from the `datatrace-api-lambda` and
+`datatrace-pipeline-lambda` groups, and the rules name those groups rather than IP ranges.
 
-    infra/pipeline.sh          # create or update, and repoint the schedule
-    infra/pipeline.sh run      # start an execution now
+The instance is `db.t4g.micro`, Postgres 17.11, 20 GB gp3 with no autoscaling, single-AZ,
+encrypted, not publicly accessible, IAM auth on, 1-day backups, deletion protection on. The
+random master password lives in Parameter Store (free; Secrets Manager is $0.40/mo per
+secret) at `/datatrace/rds/master-password`.
 
-Load and dbt retry twice; ingest retries only on Lambda service errors, since a failed board is
-already handled per-source and a rerun would refetch every board. A full run takes about 4.5
-minutes.
+Because RDS has no public address, admin SQL can't run from a laptop. `datatrace-db-admin`
+sits in the VPC and applies SQL scripts that ship in its own zip — an invoke may only name
+a bundled file, never supply SQL. Scripts run in one transaction and rows from the last
+statement come back in the response.
 
-## Public API
+```
+infra/db_admin.sh                                     # applies db_roles.sql
+infra/db_admin.sh '{"scripts":["check_roles.sql"]}'   # what api_reader can do
+infra/db_admin.sh '{"scripts":["check_load.sql"]}'    # runs and rows landed so far
+```
 
-`infra/api.sh [origin]` deploys `datatrace-api` into the VPC behind an API Gateway **HTTP API**
-(not a REST API: $1 per million requests instead of $3.50, with CORS and throttling built in).
+It connects as the master user, with the password injected as an environment variable at
+deploy time. That's the one credential IAM can't replace: granting a role `rds_iam`
+requires a password login first. Every role it creates uses IAM tokens instead.
 
-    infra/api.sh                                # no CORS headers; server-side fetches need none
-    infra/api.sh https://<site>.vercel.app      # once the browser calls the API directly
+### Schedule and alarms
 
-    GET /stats            marts.rpt_stats           headline counts and the data freshness timestamp
-    GET /postings         open postings, filtered and paged (see below)
-    GET /role-mix         marts.rpt_role_mix        share of open postings by role family
-    GET /seniority-mix    marts.rpt_seniority_mix   seniority split within each role family
-    GET /salary-by-role   marts.rpt_salary_by_role  p25/median/p75 annualised USD pay by role family
-    GET /time-to-close    marts.rpt_time_to_close   median/p90 days listed by role family, closed postings only
-    GET /daily-flow       marts.rpt_daily_flow      daily open/opened/closed by role family, with wow_change
+`pipeline.sh` builds the `datatrace-pipeline` state machine — ingest, then load, then dbt,
+each waiting on the one before. The `datatrace-ingest-daily` schedule starts the state
+machine rather than invoking ingest directly, so there's still exactly one trigger at 06:00
+Pacific. Any failing step publishes the execution state to SNS and ends the run as failed.
+Step Functions Standard is effectively free here (~120 of 4,000 free monthly transitions).
 
-Every route but `/postings` is a straight `select * from marts.<table>`: each mart is already the
-shape its dashboard section needs, aggregated once a day by dbt rather than on every request.
-`/postings` still filters and pages, since it serves rows rather than a fixed aggregate. It takes
-`q`, `company`, `role_family`, `seniority`, `work_mode`, `source`, `min_salary`, `sort`, `limit`
-and `offset`. Every filter is a bound parameter that a null switches off; `sort` is the one value
-that becomes SQL text, so it is looked up in a whitelist and a request can only pick an ordering,
-never write one. Each ordering ends on `posting_key` so paging can't repeat or skip a row.
+```
+infra/pipeline.sh          # create or update, and repoint the schedule
+infra/pipeline.sh run      # start an execution now
+```
 
-The response carries a `total` for the filtered set, computed with `count(*) over ()` in the same
-scan the page comes from — one query, not two, and the browser can say how many roles matched.
+Load and dbt retry twice. Ingest retries only on Lambda service errors, since a failed board
+is already handled per-source and a rerun would refetch every board. The state machine has a
+one-hour timeout, so a hung run ends and counts as timed out instead of blocking tomorrow's.
 
-The Lambda logs in as `api_reader` with an IAM token, in the `datatrace-api-lambda` security
-group, which may only open connections to Postgres. Its IAM policy allows `rds-db:connect` as
-that one database user and nothing else.
+`infra/alarms.sh [email]` wires four alarms to the `datatrace-alerts` SNS topic:
 
-Routing lives in the Gateway: only the routes above exist, so anything else is a 404 that never
-reaches the Lambda. The stage throttles at 10 requests/second with a burst of 20, and responses
-carry `cache-control: max-age=300` since the data changes once a day. CORS is a browser rule, not
-access control — `curl` ignores it — so the real protections are the throttle, the read-only role,
-bound parameters and the caps on `limit`, `offset` and `q`.
+- `datatrace-ingest-errors` — the ingest Lambda crashed or timed out
+- `datatrace-ingest-source-failures` — a board failed, counted from logs by a metric filter;
+  the run manifest says which
+- `datatrace-pipeline-failed` — an execution failed, timed out or was aborted, as one alarm
+  over the sum of all three metrics
+- `datatrace-pipeline-missed` — no execution started in 24h, treating missing data as
+  breaching. A failing pipeline is loud; a pipeline that never starts is silent, and this is
+  what catches it.
 
-## API role
+Four alarms, and CloudWatch only bills after ten.
 
-The public API connects as `api_reader`, which can read `marts` and nothing else. Create it once
-per database (it is safe to rerun), before the first `dbt build`:
+## API
 
-    docker compose exec -T postgres psql -U datatrace -d datatrace -v ON_ERROR_STOP=1 < infra/db_roles.sql
+`infra/api.sh [origin]` deploys `datatrace-api` into the VPC behind an API Gateway **HTTP
+API** — not a REST API: $1 per million requests instead of $3.50, with CORS and throttling
+built in.
 
-The script only creates the role and its session defaults: read-only transactions, a 5s statement
-timeout, and at most 10 connections. On RDS it also grants `rds_iam`, so the role logs in with IAM
-tokens instead of a password. dbt handles access: an `on-run-start` hook grants usage on `marts`,
-and a `grants` config re-grants `select` each time dbt rebuilds a mart table, since a new table
-starts with no grants. `tests/assert_api_reader_grants.sql` fails the build if api_reader can't read a
-mart or can read anything in `raw`, `staging` or `seeds`.
+| Route | Source | Returns |
+|---|---|---|
+| `GET /stats` | `rpt_stats` | headline counts and the data freshness timestamp |
+| `GET /postings` | `rpt_postings` | open postings, filtered and paged |
+| `GET /role-mix` | `rpt_role_mix` | share of open postings by role family |
+| `GET /seniority-mix` | `rpt_seniority_mix` | seniority split within each family |
+| `GET /salary-by-role` | `rpt_salary_by_role` | p25/median/p75 annualised USD pay |
+| `GET /time-to-close` | `rpt_time_to_close` | median/p90 days listed, closed postings only |
+| `GET /daily-flow` | `rpt_daily_flow` | daily open/opened/closed, with `wow_change` |
 
-The role can switch `default_transaction_read_only` off itself, so writes are really blocked by
-it having no write privileges. The setting is a second layer.
+Every route but `/postings` is a straight `select *` from its mart. `/postings` still
+filters and pages, since it serves rows rather than a fixed aggregate, and takes `q`,
+`company`, `role_family`, `seniority`, `work_mode`, `source`, `min_salary`, `sort`, `limit`
+and `offset`. Every filter is a bound parameter that a null switches off. `sort` is the one
+value that becomes SQL text, so it's looked up in a whitelist — a request can pick an
+ordering, never write one — and each ordering ends on `posting_key` so paging can't repeat
+or skip a row. The response carries a `total` for the filtered set computed with
+`count(*) over ()` in the same scan the page comes from: one query, not two.
+
+The Lambda connects as `api_reader`, which can read `marts` and nothing else, using an IAM
+token. dbt maintains that access — an `on-run-start` hook grants usage on `marts` and a
+`grants` config re-grants `select` on every rebuild, since a new table starts with no
+grants — and `assert_api_reader_grants.sql` fails the build if `api_reader` can't read a
+mart or *can* read anything in `raw`, `staging` or `seeds`. The role also runs with
+read-only transactions, a 5s statement timeout and at most 10 connections. It can turn the
+read-only default off itself, so writes are really blocked by it having no write privileges;
+the setting is a second layer.
+
+Routing lives in the Gateway, so anything not listed above is a 404 that never reaches the
+Lambda. The stage throttles at 10 req/s with a burst of 20, and responses carry
+`cache-control: max-age=300`. CORS is a browser rule, not access control — `curl` ignores
+it — so the real protections are the throttle, the read-only role, bound parameters and the
+caps on `limit`, `offset` and `q`.
 
 ## Frontend
 
-`web/` is a Next.js App Router site deployed on Vercel. Every page is a React Server
-Component: the browser never talks to the API, Vercel's Node runtime does, so the API
-Gateway URL stays in `DATATRACE_API_URL` (a server-side env var, not `NEXT_PUBLIC_`) and the
-API needs no CORS configuration at all.
+`web/` is a Next.js App Router site on Vercel. Every page is a React Server Component, so
+the browser never talks to the API — Vercel's Node runtime does. The Gateway URL stays in
+`DATATRACE_API_URL`, a server-side variable rather than `NEXT_PUBLIC_`, and the API needs no
+CORS configuration at all.
 
-    cd web
-    npm install
-    cp .env.example .env.local     # paste the URL infra/api.sh printed
-    npm run dev
+```
+cd web
+npm install
+cp .env.example .env.local     # paste the URL infra/api.sh printed
+npm run dev
+```
 
-- `/` is statically prerendered with `revalidate: 300`, matching the `cache-control` the Lambda
-  sends. One visitor's request warms it; everyone else that five minutes is served from the edge
-  cache, so a burst of traffic is a handful of Lambda invocations, not one per visitor. The data
-  changes once a day, so nothing is ever more than 5 minutes stale anyway.
-- `/postings` is dynamic because its filters live in the URL. The free-text fields are a plain
-  GET `<form>`; each facet is a popover of `<Link>`s built on the server. Nothing fetches from
-  the browser, and every filtered view is a shareable, cacheable URL. Radix's popover is the only
-  client-side state on the page — it owns open/closed and nothing else.
-- Charts: the mix and salary sections are server-rendered HTML/CSS marks with every value
-  printed, so they ship no JavaScript. Only the two that earn a hover layer (time-to-close,
-  daily flow) are client components using Recharts.
+`/` is statically prerendered with `revalidate: 300`, matching the `cache-control` the
+Lambda sends. One visitor's request warms it and everyone else that five minutes is served
+from the edge cache, so a burst of traffic is a handful of Lambda invocations rather than
+one per visitor. The data changes once a day, so nothing is ever meaningfully stale.
+
+`/postings` is dynamic because its filters live in the URL. The free-text fields are a plain
+GET `<form>` and each facet is a popover of server-built `<Link>`s, so every filtered view is
+a shareable, cacheable URL and nothing fetches from the browser. Radix's popover is the only
+client-side state on the page.
+
+The mix and salary charts are server-rendered HTML/CSS marks with every value printed, so
+they ship no JavaScript. Only the two that earn a hover layer — time-to-close and daily flow
+— are client components using Recharts.
 
 Company logos come from `/logo/[domain]`, a route handler that proxies an icon service. No
-source API gives us a company website, so the domain is guessed from the display name; a miss is
-the expected case and the route answers with a drawn monogram rather than a 404, which is why the
-card stays a server component with no broken-image state to handle. Proxying rather than
+source API gives a company website, so the domain is guessed from the display name and a
+miss is the expected case: the route answers with a drawn monogram rather than a 404, which
+is why the card stays a server component with no broken-image state. Proxying rather than
 hotlinking means the visitor's browser only ever talks to this site, so browsing the board
-doesn't hand a third party the list of companies you looked at. Each icon is cached for a week,
-so the upstream sees one request per company per week no matter how much traffic the page gets.
+doesn't hand a third party the list of companies you looked at. Icons cache for a week.
 
-The look is three values — cream paper, near-black ink, one burnt orange — with Playfair Display
-for headlines and posting titles, Source Serif for prose, JetBrains Mono for every label and
-number, 1px rules and no border radius. The site is light only; tokens live in `app/globals.css`.
-Orange is the single hue: solid orange is the primary measure in every chart and the one action in
-every control, and the comparison series is carried by a 45° hatch fill or a dashed stroke rather
-than a second colour — the channel a colour-blind or black-and-white reader falls back to anyway.
-At 4.84:1 on the cream it clears AA as text, and white on it clears 5.18:1, so it works as a fill
-and as a foreground. Recharts passes `var(--accent)` straight through to SVG, so the charts need
-no palette config of their own.
+The look is three values — cream paper, near-black ink, one burnt orange — with Playfair
+Display for headlines, Source Serif for prose and JetBrains Mono for every label and number,
+1px rules and no border radius. Light only; tokens live in `app/globals.css`. Orange is the
+single hue: solid orange is the primary measure in every chart and the one action in every
+control, and a comparison series is carried by a 45° hatch or a dashed stroke rather than a
+second colour — the channel a colour-blind or black-and-white reader falls back to anyway.
+At 4.84:1 on the cream it clears AA as text, and white on it clears 5.18:1, so it works as
+both fill and foreground. Recharts passes `var(--accent)` straight through to SVG, so the
+charts need no palette config.
 
-On Vercel, set the project's Root Directory to `web` and add `DATATRACE_API_URL` for all three
-environments. The free Hobby plan covers this; the only AWS cost the site adds is API Gateway
-requests and Lambda invocations, both of which the 5-minute cache keeps to a trickle.
+On Vercel, set the project's Root Directory to `web` and add `DATATRACE_API_URL` for all
+three environments.
 
 ## Tableau
 
-Tableau Public can't connect to Postgres, so the dashboard reads a CSV extract of
-`marts.rpt_postings`: one row per posting with display labels, `company_name`, annualised USD
-pay (`salary_annual_mid_usd`) and `data_as_of` already on it. Aggregation happens in Tableau.
+Tableau Public can't connect to Postgres, so the workbook reads a CSV extract of
+`marts.rpt_postings` — one row per posting with display labels, `company_name`, annualised
+USD pay and `data_as_of` already on it. Aggregation happens in Tableau.
 
-    cd dbt && uv run dbt build && cd ..
-    uv run datatrace-export          # writes exports/rpt_postings.csv
+```
+cd dbt && uv run dbt build && cd ..
+uv run datatrace-export          # writes exports/rpt_postings.csv
+```
 
 To refresh the published dashboard, re-export, open the workbook in Tableau Public, refresh
-the data source and save it back to Tableau Public. Filter on `is_open` for current postings;
-RemoteOK rows count as open because its feed can't tell us when a job closes.
+the data source and save it back. Filter on `is_open` for current postings; RemoteOK rows
+count as open because its feed can't say when a job closes.
+
+## Cost
+
+RDS is the only meaningful line item at roughly **$14/month** until the instance is deleted,
+plus about $0.25/month of ECR storage. Everything else — Lambda, Step Functions, EventBridge,
+S3, Parameter Store, four CloudWatch alarms, API Gateway at this traffic, and Vercel Hobby —
+sits inside free tiers. `infra/budget.sh [email] [limit]` sets a monthly budget (default $25)
+with email alerts; AWS Budgets is free for the first two.
+
+The choices that keep it there are deliberate: no NAT Gateway (~$32/mo avoided), an HTTP API
+instead of REST, Parameter Store instead of Secrets Manager, a 5-minute edge cache in front
+of the API, and pre-aggregated marts so a page view is a single-row read.
