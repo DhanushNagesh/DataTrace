@@ -10,6 +10,16 @@ Everything runs on a schedule with no machine of mine involved: one EventBridge 
 starts a Step Functions execution at 06:00 Pacific, and about four and a half minutes
 later the dashboard is showing the new day's numbers.
 
+## The dashboard
+
+![DataTrace homepage — headline stat tiles and the role mix chart](docs/images/home.png)
+
+*The homepage: headline counts, then role mix — the first of five server-rendered sections.*
+
+![The postings page — filtered posting list with facet popovers](docs/images/postings.png)
+
+*`/postings`: every filter lives in the URL, so a filtered view is shareable.*
+
 ## Architecture
 
 ```
@@ -421,6 +431,10 @@ uv run datatrace-export          # writes exports/rpt_postings.csv
 To refresh the published dashboard, re-export, open the workbook in Tableau Public, refresh
 the data source and save it back. Filter on `is_open` for current postings; RemoteOK rows
 count as open because its feed can't say when a job closes.
+
+![Tableau Public workbook reading the rpt_postings CSV extract](docs/images/tableau.png)
+
+*The Tableau Public workbook, reading the same `rpt_postings` extract.*
 
 ## Cost
 
