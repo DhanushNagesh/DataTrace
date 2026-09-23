@@ -457,3 +457,7 @@ with email alerts; AWS Budgets is free for the first two.
 The choices that keep it there are deliberate: no NAT Gateway (~$32/mo avoided), an HTTP API
 instead of REST, Parameter Store instead of Secrets Manager, a 5-minute edge cache in front
 of the API, and pre-aggregated marts so a page view is a single-row read.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
