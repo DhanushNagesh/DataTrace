@@ -93,7 +93,7 @@ tests/             pytest
 ```
 uv sync
 docker compose up -d                  # Postgres 17 for dbt development
-cp .env.example .env
+echo 'DATABASE_URL=postgresql://datatrace:datatrace@localhost:5432/datatrace' > .env
 uv run datatrace-load --src data/raw
 cd dbt && uv run dbt build
 ```
@@ -369,7 +369,7 @@ CORS configuration at all.
 ```
 cd web
 npm install
-cp .env.example .env.local     # paste the URL infra/api.sh printed
+echo 'DATATRACE_API_URL=<the URL infra/api.sh printed>' > .env.local
 npm run dev
 ```
 
