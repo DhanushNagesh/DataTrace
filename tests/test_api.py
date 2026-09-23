@@ -12,16 +12,16 @@ MARTS = """
 create table marts.rpt_postings (
     posting_key text, source text, company_name text, title text, role_family text,
     seniority text, work_mode text, location text, salary_annual_mid_usd numeric,
-    url text, first_seen_at timestamptz, is_open boolean, days_listed numeric,
-    data_as_of timestamptz
+    url text, published_at timestamptz, first_seen_at timestamptz, is_open boolean,
+    days_listed numeric, data_as_of timestamptz
 );
 insert into marts.rpt_postings values
     ('a', 'lever', 'Acme', 'Data Engineer', 'Data Engineering', 'Mid', 'Remote (US)',
-     'Remote', 150000, 'https://a', '2026-09-17', true, 3.0, '2026-09-18'),
+     'Remote', 150000, 'https://a', '2026-09-16', '2026-09-17', true, 3.0, '2026-09-18'),
     ('b', 'greenhouse', 'Beta', 'Account Executive', 'Sales & Success', 'Senior',
-     'On-site / hybrid', 'NYC', 90000, 'https://b', '2026-08-01', true, 48.0, '2026-09-18'),
+     'On-site / hybrid', 'NYC', 90000, 'https://b', null, '2026-08-01', true, 48.0, '2026-09-18'),
     ('c', 'greenhouse', 'Beta', 'Data Analyst', 'Data Analytics', 'Entry',
-     'On-site / hybrid', 'NYC', null, 'https://c', '2026-08-01', false, 48.0, '2026-09-18');
+     'On-site / hybrid', 'NYC', null, 'https://c', null, '2026-08-01', false, 48.0, '2026-09-18');
 
 create table marts.rpt_stats (
     open_postings bigint, new_this_week bigint, companies bigint, sources bigint,
@@ -143,6 +143,52 @@ def test_postings_sorts_only_by_a_known_key(marts):
         "GET /postings", {"sort": "first_seen_at; drop table marts.rpt_postings"}
     )
     assert status == 400
+
+
+def test_postings_pages_cleanly_when_every_row_shares_a_timestamp(marts):
+    # The state the warehouse is in after a single ingest run: one first_seen_at for everything,
+    # so the whole ordering rests on the tiebreaker. Paging must still cover each row once.
+    marts.execute("delete from marts.rpt_postings")
+    marts.execute(
+        """
+        insert into marts.rpt_postings
+        select 'lever:acme:' || n, 'lever', 'Acme', 'Engineer ' || n, 'Engineering', 'Mid',
+               'Remote (US)', 'Remote', null, 'https://x', '2026-09-17', '2026-09-17', true, 1.0,
+               '2026-09-18'
+        from generate_series(1, 9) as n
+        """
+    )
+
+    seen = []
+    for offset in range(0, 9, 3):
+        _, body = call("GET /postings", {"limit": "3", "offset": str(offset)})
+        seen += [p["posting_key"] for p in body["postings"]]
+
+    assert len(seen) == len(set(seen)) == 9
+
+
+def test_date_sorts_read_published_at_not_ingest_time(marts):
+    # b was published first but ingested last, so a sort on first_seen_at would invert these.
+    # published_at is the board's own date and is the only one that means "posted".
+    marts.execute("delete from marts.rpt_postings")
+    marts.execute(
+        """
+        insert into marts.rpt_postings values
+            ('a', 'lever', 'Acme', 'A', 'Engineering', 'Mid', 'Remote (US)', 'Remote', null,
+             'https://a', '2026-09-20', '2026-08-01', true, 1.0, '2026-09-22'),
+            ('b', 'lever', 'Acme', 'B', 'Engineering', 'Mid', 'Remote (US)', 'Remote', null,
+             'https://b', '2026-09-01', '2026-09-21', true, 1.0, '2026-09-22'),
+            ('c', 'lever', 'Acme', 'C', 'Engineering', 'Mid', 'Remote (US)', 'Remote', null,
+             'https://c', null, '2026-09-21', true, 1.0, '2026-09-22')
+        """
+    )
+
+    _, body = call("GET /postings", {"sort": "newest"})
+    assert [p["posting_key"] for p in body["postings"]] == ["a", "b", "c"]
+
+    # A posting with no date is never the oldest either; it sorts last both ways
+    _, body = call("GET /postings", {"sort": "oldest"})
+    assert [p["posting_key"] for p in body["postings"]] == ["b", "a", "c"]
 
 
 def test_postings_treats_input_as_data(marts):

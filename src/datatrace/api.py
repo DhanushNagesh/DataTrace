@@ -64,13 +64,24 @@ def int_param(params: dict, name: str, default: int, maximum: int) -> int:
 
 
 # Whitelist: the value picked here becomes SQL text, so a request can only choose an ordering,
-# never write one. Every sort ends on posting_key so paging can't repeat or skip a row.
+# never write one.
+#
+# Date sorts run on published_at, the date the board itself gives the posting, not first_seen_at,
+# which is only when our ingest first saw the row and is the same value for every row until the
+# warehouse has several runs behind it. Boards that give no date sort last rather than claiming
+# to be the newest or the oldest.
+#
+# Every sort ends on md5(posting_key) rather than posting_key itself. The tiebreaker has to be
+# deterministic or paging repeats and skips rows, but posting_key is 'source:board:id', so
+# ordering by it groups a whole company together — with a constant leading key the sort falls
+# through entirely and the first page is two companies. Hashing keeps the determinism and drops
+# the clustering.
 SORTS = {
-    "newest": "first_seen_at desc, posting_key",
-    "oldest": "first_seen_at, posting_key",
-    "salary_high": "salary_annual_mid_usd desc nulls last, posting_key",
-    "salary_low": "salary_annual_mid_usd, posting_key",
-    "company": "company_name, first_seen_at desc, posting_key",
+    "newest": "published_at desc nulls last, md5(posting_key)",
+    "oldest": "published_at nulls last, md5(posting_key)",
+    "salary_high": "salary_annual_mid_usd desc nulls last, md5(posting_key)",
+    "salary_low": "salary_annual_mid_usd, md5(posting_key)",
+    "company": "company_name, first_seen_at desc, md5(posting_key)",
 }
 
 
@@ -94,7 +105,7 @@ def postings(conn: psycopg.Connection, params: dict) -> dict:
     rows = conn.execute(
         f"""
         select posting_key, source, company_name, title, role_family, seniority, work_mode,
-               location, salary_annual_mid_usd, url, first_seen_at, days_listed,
+               location, salary_annual_mid_usd, url, published_at, first_seen_at, days_listed,
                count(*) over () as total
         from marts.rpt_postings
         where is_open

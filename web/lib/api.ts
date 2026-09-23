@@ -68,6 +68,9 @@ export type Posting = {
   location: string | null;
   salary_annual_mid_usd: number | null;
   url: string;
+  // When the board says the role went up. first_seen_at is only when our ingest first saw it,
+  // which is the same timestamp for every row until the warehouse has a few runs behind it.
+  published_at: string | null;
   first_seen_at: string;
   days_listed: number | null;
 };
