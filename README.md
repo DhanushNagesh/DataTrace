@@ -1,5 +1,7 @@
 # DataTrace
 
+**[Live site](https://datatrace-gamma.vercel.app/)** · **[Tableau dashboard](https://public.tableau.com/app/profile/dhanush.nagesh/viz/DataTraceUSTechJobPostings/Dashboard1)**
+
 DataTrace collects software and data job postings from public job board APIs every
 morning, keeps every raw response in S3, models them in Postgres with dbt, and serves
 the results through a read-only API to a Next.js dashboard. It answers the questions a
@@ -12,13 +14,15 @@ later the dashboard is showing the new day's numbers.
 
 ## The dashboard
 
-![DataTrace homepage — headline stat tiles and the role mix chart](docs/images/home.png)
+Live at **[datatrace-gamma.vercel.app](https://datatrace-gamma.vercel.app/)**.
 
-*The homepage: headline counts, then role mix — the first of five server-rendered sections.*
+![DataTrace /intelligence — headline stat tiles and the role mix chart](docs/images/home.png)
+
+*`/intelligence`: headline counts, then role mix — the first of five server-rendered sections.*
 
 ![The postings page — filtered posting list with facet popovers](docs/images/postings.png)
 
-*`/postings`: every filter lives in the URL, so a filtered view is shareable.*
+*`/postings`, the front door: every filter lives in the URL, so a filtered view is shareable.*
 
 ## Architecture
 
@@ -383,10 +387,14 @@ echo 'DATATRACE_API_URL=<the URL infra/api.sh printed>' > .env.local
 npm run dev
 ```
 
-`/` is statically prerendered with `revalidate: 300`, matching the `cache-control` the
-Lambda sends. One visitor's request warms it and everyone else that five minutes is served
-from the edge cache, so a burst of traffic is a handful of Lambda invocations rather than
-one per visitor. The data changes once a day, so nothing is ever meaningfully stale.
+`/` redirects to `/postings`: the roles list is the front door, and the charts sit one click
+away at `/intelligence`.
+
+`/intelligence` is statically prerendered. Every API fetch sets `revalidate: 300`
+(`web/lib/api.ts`), matching the `cache-control` the Lambda sends. One visitor's request
+warms it and everyone else that five minutes is served from the edge cache, so a burst of
+traffic is a handful of Lambda invocations rather than one per visitor. The data changes
+once a day, so nothing is ever meaningfully stale.
 
 `/postings` is dynamic because its filters live in the URL. The free-text fields are a plain
 GET `<form>` and each facet is a popover of server-built `<Link>`s, so every filtered view is
@@ -418,6 +426,8 @@ On Vercel, set the project's Root Directory to `web` and add `DATATRACE_API_URL`
 three environments.
 
 ## Tableau
+
+Published at **[public.tableau.com/…/DataTraceUSTechJobPostings](https://public.tableau.com/app/profile/dhanush.nagesh/viz/DataTraceUSTechJobPostings/Dashboard1)**.
 
 Tableau Public can't connect to Postgres, so the workbook reads a CSV extract of
 `marts.rpt_postings` — one row per posting with display labels, `company_name`, annualised
