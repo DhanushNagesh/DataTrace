@@ -25,6 +25,11 @@ models:
       +grants:
         select: ["api_reader"]
 
+vars:
+  # Boards no longer in config/boards.toml. See the not_retired_board macro for why retiring a
+  # board has to happen here as well as in the config.
+  retired_boards: ["smartrecruiters/Equinox"]
+
 seeds:
   datatrace:
     +schema: seeds

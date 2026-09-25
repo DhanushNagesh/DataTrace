@@ -10,6 +10,7 @@
 ] %}
 
 {% for model in sources %}
-select * from {{ ref(model) }} where is_us or is_remote_anywhere
+select * from {{ ref(model) }}
+where (is_us or is_remote_anywhere) and {{ not_retired_board() }}
 {% if not loop.last %}union all{% endif %}
 {% endfor %}

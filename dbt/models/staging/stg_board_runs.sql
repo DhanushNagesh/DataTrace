@@ -5,3 +5,4 @@ select distinct
     board,
     ingested_at as observed_at
 from {{ source('raw', 'job_postings') }}
+where {{ not_retired_board() }}
