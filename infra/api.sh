@@ -61,12 +61,22 @@ for route in "${ROUTES[@]}"; do
   fi
 done
 
-# A portfolio dashboard needs a handful of requests a second at most. The cap is what stops a
-# scraper or a loop from turning a public URL into a bill and a database load.
+# Nothing but Vercel calls this API, and Vercel caches every response for five minutes, so the
+# steady state is a few requests a minute no matter how many people are on the site. 2/sec is
+# far above that and still bounds the worst case: a caller holding the throttle open all month
+# is ~5M requests, around $10 of Gateway, Lambda and egress, rather than the ~$50 that 10/sec
+# would have allowed. The burst covers a cold cache refilling several routes at once.
 aws apigatewayv2 get-stage --api-id "$API_ID" --stage-name '$default' >/dev/null 2>&1 ||
   aws apigatewayv2 create-stage --api-id "$API_ID" --stage-name '$default' --auto-deploy >/dev/null
 aws apigatewayv2 update-stage --api-id "$API_ID" --stage-name '$default' --auto-deploy \
-  --default-route-settings 'ThrottlingRateLimit=10,ThrottlingBurstLimit=20' >/dev/null
+  --default-route-settings 'ThrottlingRateLimit=2,ThrottlingBurstLimit=10' >/dev/null
+
+# /postings is the only route that touches a table rather than a pre-aggregated mart, and the
+# only one a caller can vary with query params, so it gets a tighter cap of its own. The
+# account's Lambda concurrency limit is 10 across every function, so an API flood competes with
+# the daily pipeline for slots; holding this route down keeps a scraper from starving ingest.
+aws apigatewayv2 update-stage --api-id "$API_ID" --stage-name '$default' \
+  --route-settings 'GET /postings={ThrottlingRateLimit=1,ThrottlingBurstLimit=5}' >/dev/null
 
 # Lambda only accepts calls from this API; the statement id makes the grant idempotent
 aws lambda add-permission --function-name "$FUNCTION" --statement-id apigateway-invoke \

@@ -78,6 +78,22 @@ aws cloudwatch put-metric-alarm "${common[@]}" \
   --threshold 1 --comparison-operator LessThanThreshold \
   --treat-missing-data breaching
 
+# Vercel caches every API response for five minutes, so normal traffic is a few requests a
+# minute however busy the site is. A sustained 2,000 an hour means something is looping against
+# the API, and this fires within the hour rather than waiting on the monthly budget alert.
+API_ID="$(aws apigatewayv2 get-apis --region "$REGION" \
+  --query "Items[?Name=='datatrace-api'].ApiId | [0]" --output text)"
+if [ "$API_ID" != None ]; then
+  aws cloudwatch put-metric-alarm "${common[@]}" \
+    --alarm-name datatrace-api-flood \
+    --alarm-description "Unusual API request volume: a scraper or a loop, not visitors" \
+    --namespace AWS/ApiGateway --metric-name Count \
+    --dimensions "Name=ApiId,Value=$API_ID" \
+    --statistic Sum --period 3600 \
+    --threshold 2000 --comparison-operator GreaterThanThreshold \
+    --treat-missing-data notBreaching
+fi
+
 # Superseded by datatrace-pipeline-missed: the schedule now starts the state machine, not the
 # ingest function, and two alarms for one outage is just two emails.
 aws cloudwatch delete-alarms --region "$REGION" --alarm-names datatrace-ingest-missed
