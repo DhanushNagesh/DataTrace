@@ -34,9 +34,9 @@ Customer Service Representative,,operations_support,unspecified
 Administrative Assistant,,corporate,unspecified
 Executive Business Partner,,corporate,unspecified
 HR Business Partner,,corporate,unspecified
-Restaurant General Manager,,hospitality_fitness,unspecified
+Restaurant General Manager,,hospitality_fitness,manager
 "Associate, Process Improvement",Business Operations,operations_support,entry
-"Manager, Strategic Planning",Finance,corporate,unspecified
+"Manager, Strategic Planning",Finance,corporate,manager
 "Chief of Staff, Online Grocery",Product,product,director_plus
 "Experience Lead, Anthem Row",Club - Staff,hospitality_fitness,staff_plus
 "Key Lead, LA",Retail (Stores),hospitality_fitness,staff_plus
@@ -50,7 +50,7 @@ Senior Quality Inspector - Test & Launch,G-Launch Build and Design,other,senior
 "Personal Trainer, Bryant Park",Club - Personal Training,hospitality_fitness,unspecified
 NP/PA - Virtual Urgent Care,Oscar Medical Group,healthcare,unspecified
 Care Coordinator,Clinical,healthcare,unspecified
-Assistant Restaurant Manager,Club - Staff,hospitality_fitness,unspecified
+Assistant Restaurant Manager,Club - Staff,hospitality_fitness,manager
 Senior Data Scientist,Marketing,data_science_ml,senior
 Staff Software Engineer,Club - Staff,engineering,staff_plus
 Software Engineer,,engineering,unspecified
@@ -59,3 +59,9 @@ Mid-Level Backend Engineer,,engineering,mid
 Quantitative Researcher,Quant Management,data_science_ml,unspecified
 Senior Technical Sourcer,Talent Acquisition,corporate,senior
 Technical Writer,Engineering,engineering,unspecified
+"Engineering Manager, Payments Platform",,engineering,manager
+"Manager I, Engineering - Cloud FinOps",,engineering,manager
+"Senior Manager, Revenue Accounting",Finance,corporate,manager
+"Tech Lead Manager, Agent Runtime Platform",Engineering,engineering,manager
+"Account Manager, Enterprise",,sales_success,unspecified
+"Senior Technical Program Manager, Billing",,operations_support,senior

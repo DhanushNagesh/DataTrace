@@ -5,6 +5,7 @@ const SHORT: Record<string, string> = {
   Entry: "Ent",
   Mid: "Mid",
   Senior: "Sen",
+  Manager: "Mgr",
   "Staff+": "Stf",
   "Director+": "Dir",
   Unspecified: "?",

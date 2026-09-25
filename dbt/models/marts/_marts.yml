@@ -27,11 +27,13 @@ models:
       - name: seniority
         description: >
           Seniority from title keywords. 'mid' means the posting said so ("Engineer II"); titles
-          stating no level are 'unspecified' rather than being assumed mid.
+          stating no level are 'unspecified' rather than being assumed mid. 'manager' is people
+          management only: IC "<noun> Manager" titles such as Product or Program Manager are not
+          counted as a level.
         data_tests:
           - accepted_values:
               arguments:
-                values: [intern, entry, mid, senior, staff_plus, director_plus, unspecified]
+                values: [intern, entry, mid, senior, manager, staff_plus, director_plus, unspecified]
       - name: first_seen_at
         description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
         data_tests: [not_null]
@@ -79,7 +81,7 @@ models:
       - name: company_name
         data_tests: [not_null]
       - name: seniority_rank
-        description: 1 (intern) to 6 (director+), 7 unspecified, for sorting seniority in Tableau.
+        description: 1 (intern) to 7 (director+), 8 unspecified, for sorting seniority in Tableau.
         data_tests: [not_null]
       - name: salary_annual_mid_usd
         description: >
@@ -131,7 +133,7 @@ models:
       - name: seniority
         data_tests: [not_null]
       - name: seniority_rank
-        description: 1 (intern) to 7 (unspecified). Order by this, not the label, which sorts alphabetically.
+        description: 1 (intern) to 8 (unspecified). Order by this, not the label, which sorts alphabetically.
         data_tests: [not_null]
       - name: pct_of_family
         data_tests: [not_null]
