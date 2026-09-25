@@ -76,9 +76,15 @@ single day.
 ## Sources and scope
 
 Public JSON APIs from **Greenhouse** (54 boards), **Ashby** (12), **Lever** (5),
-**SmartRecruiters** (4) and **Rippling** (1), plus the **RemoteOK** feed. Boards are
+**SmartRecruiters** (3) and **Rippling** (1), plus the **RemoteOK** feed. Boards are
 listed in `config/boards.toml` and were picked for US-heavy postings across tech,
 fintech, healthcare, consumer, gaming and hardware.
+
+RemoteOK is capped by its own API, not by the ingest: `remoteok.com/api` serves only the
+most recent ~100 jobs and has no pagination, so every run returns 99 rows and roughly 70
+survive the US filter. That is a ceiling, not a plateau — a flat daily count from this
+source says nothing about the market. It is kept because it is the only non-ATS feed here,
+and it is excluded from `rpt_daily_flow` for the same reason its `is_active` is null.
 
 Scope is US-accessible postings. Raw data lands unfiltered and the US filter happens in
 dbt staging, so changing the definition is a rebuild, not a re-ingest. Workday, iCIMS and
