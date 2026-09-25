@@ -9,6 +9,6 @@ select
     round(100.0 * count(*) filter (where is_remote or is_remote_anywhere) / count(*), 1) as pct_remote,
     round(100.0 * count(salary_min) / count(*), 1) as pct_with_salary
 from {{ ref('fct_job_postings') }}
-where is_active is not false
+where is_active is not false and not is_stale
 group by 1
 order by postings desc

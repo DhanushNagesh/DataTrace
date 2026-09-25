@@ -42,7 +42,8 @@ select
     first_seen_at,
     last_seen_at,
     -- RemoteOK is_active is null (rolling feed); the analyses count those as open, and so does this
-    is_active is not false as is_open,
+    is_active is not false and not is_stale as is_open,
+    is_stale,
     round(days_listed::numeric, 1) as days_listed,
     (select max(observed_at) from {{ ref('stg_board_runs') }}) as data_as_of
 from postings

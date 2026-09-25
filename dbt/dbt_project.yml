@@ -30,6 +30,10 @@ vars:
   # board has to happen here as well as in the config.
   retired_boards: ["smartrecruiters/Equinox"]
 
+  # Days after its publish date that a posting stops counting as open, however long the board
+  # keeps showing it. See is_stale in fct_job_postings.
+  stale_after_days: 365
+
 seeds:
   datatrace:
     +schema: seeds

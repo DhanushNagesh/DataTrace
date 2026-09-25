@@ -41,6 +41,10 @@ models:
         description: >
           Seen in the most recent run that returned this board's postings. Null for RemoteOK, whose
           feed is a rolling window of recent jobs, so absence doesn't mean closed.
+      - name: is_stale
+        description: >
+          Published more than stale_after_days ago. Boards that never expire a req keep returning
+          it, so is_active alone would report it open indefinitely. Marts treat stale as closed.
         data_tests:
           - not_null:
               config:
@@ -88,7 +92,11 @@ models:
           Midpoint of the USD pay range, annualised (2,080 hours, 260 days, 52 weeks). Null when the
           posting has no USD pay or the result falls outside 15k-1M, which means a mislabelled interval.
       - name: is_open
-        description: is_active, with RemoteOK's null counted as open.
+        description: >
+          is_active, with RemoteOK's null counted as open, and excluding postings past the
+          staleness cutoff.
+      - name: is_stale
+        description: Past the staleness cutoff. Exposed so the cutoff's effect stays visible in Tableau.
       - name: data_as_of
         description: Latest ingest run in the warehouse, repeated on every row for the dashboard footer.
 
