@@ -5,7 +5,7 @@ with labelled as (
         {{ seniority_label('seniority') }} as seniority,
         {{ seniority_rank('seniority') }} as seniority_rank
     from {{ ref('fct_job_postings') }}
-    where is_active is not false
+    where {{ is_open_posting() }}
 )
 
 select

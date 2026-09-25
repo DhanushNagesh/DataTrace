@@ -6,6 +6,8 @@ select
     round(percentile_cont(0.5) within group (order by days_listed)::numeric, 1) as median_days,
     round(percentile_cont(0.9) within group (order by days_listed)::numeric, 1) as p90_days
 from {{ ref('fct_job_postings') }}
-where is_active = false
+-- Stale postings are excluded rather than counted as closing at the cutoff: we never saw them
+-- close, and a seven-year days_listed would drag the median and p90 for its whole family.
+where is_active = false and not is_stale
 group by 1
 order by median_days

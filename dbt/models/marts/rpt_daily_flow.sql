@@ -4,8 +4,14 @@ with postings as (
     select
         {{ role_family_label('f.role_family') }} as role_family,
         f.first_seen_at::date as opened_on,
-        -- First day the posting was gone, assuming daily runs
-        case when f.is_active = false then f.last_seen_at::date + 1 end as closed_on,
+        -- First day the posting was gone, assuming daily runs. A posting its board never expires
+        -- closes at the staleness cutoff instead, so the stock curve matches the headline count.
+        -- least() ignores the null arm for a posting that is still listed.
+        least(
+            case when f.is_active = false then f.last_seen_at::date + 1 end,
+            (coalesce(f.published_at, f.first_seen_at)
+                + interval '{{ var("stale_after_days") }} days')::date
+        ) as closed_on,
         -- Everything in a board's first run already existed; counting it as opened that day
         -- would make day one look like a hiring boom.
         f.first_seen_at > b.first_run_at as is_new

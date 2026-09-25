@@ -13,7 +13,9 @@ ROLE=datatrace-db-admin-lambda
 HANDLER=datatrace.db_admin.handler
 ZIP=dist/db-admin.zip
 SG_NAME=datatrace-pipeline-lambda
-TIMEOUT=60
+# check_data.sql scans raw.job_postings, which grows with every run; at 137k rows it already
+# needed more than a minute. Raised so a reporting script doesn't time out as the warehouse fills.
+TIMEOUT=240
 MEMORY=256
 
 # The master password reaches the function as an environment variable, encrypted at rest. It is

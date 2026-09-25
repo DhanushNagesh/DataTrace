@@ -26,5 +26,5 @@ ashby = [
     "snowflake", "benchling", "harvey", "elevenlabs",
 ]
 # Tokens are case-sensitive company identifiers, not always the plain name
-smartrecruiters = ["ServiceNow", "LinkedIn3", "NBCUniversal3", "Equinox"]
+smartrecruiters = ["ServiceNow", "LinkedIn3", "NBCUniversal3"]
 rippling = ["rippling"]

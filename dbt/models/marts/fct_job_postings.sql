@@ -23,8 +23,9 @@ board_latest as (
     select source, board, max(observed_at) as latest_run_at
     from {{ ref('stg_board_runs') }}
     group by source, board
-)
+),
 
+assembled as (
 select
     latest.posting_key,
     {{ company_key('latest.company') }} as company_key,
@@ -63,3 +64,13 @@ join seen using (posting_key)
 join board_latest
     on board_latest.source = latest.source
     and board_latest.board is not distinct from latest.board
+)
+
+select
+    *,
+    -- A board that never expires a req keeps returning it in every run, so is_active stays true
+    -- forever: the oldest posting still counted open was published in 2019. Past the cutoff the
+    -- posting is treated as closed no matter what the board says. This trades away genuine
+    -- evergreen reqs, which do exist, for not reporting seven-year-old roles as open.
+    days_listed > {{ var('stale_after_days') }} as is_stale
+from assembled

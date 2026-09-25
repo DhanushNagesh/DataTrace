@@ -7,7 +7,7 @@ import { getPostings, getRoleMix, getStats } from "@/lib/api";
 import { count, dateTime } from "@/lib/format";
 import { withParams, type Search } from "@/lib/query";
 
-const SENIORITIES = ["Intern", "Entry", "Mid", "Senior", "Staff+", "Director+", "Unspecified"];
+const SENIORITIES = ["Intern", "Entry", "Mid", "Senior", "Manager", "Staff+", "Director+", "Unspecified"];
 const WORK_MODES = ["Remote (anywhere)", "Remote (US)", "On-site / hybrid"];
 const SOURCES = ["greenhouse", "lever", "ashby", "smartrecruiters", "rippling", "remoteok"];
 const MIN_SALARY = ["80000", "120000", "160000", "200000"];

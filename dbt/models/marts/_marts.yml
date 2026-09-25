@@ -27,11 +27,13 @@ models:
       - name: seniority
         description: >
           Seniority from title keywords. 'mid' means the posting said so ("Engineer II"); titles
-          stating no level are 'unspecified' rather than being assumed mid.
+          stating no level are 'unspecified' rather than being assumed mid. 'manager' is people
+          management only: IC "<noun> Manager" titles such as Product or Program Manager are not
+          counted as a level.
         data_tests:
           - accepted_values:
               arguments:
-                values: [intern, entry, mid, senior, staff_plus, director_plus, unspecified]
+                values: [intern, entry, mid, senior, manager, staff_plus, director_plus, unspecified]
       - name: first_seen_at
         description: First ingest run that saw the posting. Not the publish date; bounded below by when ingestion started.
         data_tests: [not_null]
@@ -39,6 +41,10 @@ models:
         description: >
           Seen in the most recent run that returned this board's postings. Null for RemoteOK, whose
           feed is a rolling window of recent jobs, so absence doesn't mean closed.
+      - name: is_stale
+        description: >
+          Published more than stale_after_days ago. Boards that never expire a req keep returning
+          it, so is_active alone would report it open indefinitely. Marts treat stale as closed.
         data_tests:
           - not_null:
               config:
@@ -79,14 +85,18 @@ models:
       - name: company_name
         data_tests: [not_null]
       - name: seniority_rank
-        description: 1 (intern) to 6 (director+), 7 unspecified, for sorting seniority in Tableau.
+        description: 1 (intern) to 7 (director+), 8 unspecified, for sorting seniority in Tableau.
         data_tests: [not_null]
       - name: salary_annual_mid_usd
         description: >
           Midpoint of the USD pay range, annualised (2,080 hours, 260 days, 52 weeks). Null when the
           posting has no USD pay or the result falls outside 15k-1M, which means a mislabelled interval.
       - name: is_open
-        description: is_active, with RemoteOK's null counted as open.
+        description: >
+          is_active, with RemoteOK's null counted as open, and excluding postings past the
+          staleness cutoff.
+      - name: is_stale
+        description: Past the staleness cutoff. Exposed so the cutoff's effect stays visible in Tableau.
       - name: data_as_of
         description: Latest ingest run in the warehouse, repeated on every row for the dashboard footer.
 
@@ -131,7 +141,7 @@ models:
       - name: seniority
         data_tests: [not_null]
       - name: seniority_rank
-        description: 1 (intern) to 7 (unspecified). Order by this, not the label, which sorts alphabetically.
+        description: 1 (intern) to 8 (unspecified). Order by this, not the label, which sorts alphabetically.
         data_tests: [not_null]
       - name: pct_of_family
         data_tests: [not_null]
