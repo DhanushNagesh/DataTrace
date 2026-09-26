@@ -5,31 +5,21 @@ import { JobCard } from "@/components/job-card";
 import { Rule } from "@/components/rule";
 import { getPostings, getRoleMix, getStats } from "@/lib/api";
 import { count, dateTime } from "@/lib/format";
+import { MIN_SALARY, PAGE_SIZE, SENIORITIES, SORTS, SOURCES, WORK_MODES } from "@/lib/facets";
 import { withParams, type Search } from "@/lib/query";
-
-const SENIORITIES = ["Intern", "Entry", "Mid", "Senior", "Manager", "Staff+", "Director+", "Unspecified"];
-const WORK_MODES = ["Remote (anywhere)", "Remote (US)", "On-site / hybrid"];
-const SOURCES = ["greenhouse", "lever", "ashby", "smartrecruiters", "rippling", "remoteok"];
-const MIN_SALARY = ["80000", "120000", "160000", "200000"];
-const SORTS: Record<string, string> = {
-  newest: "Newest first",
-  oldest: "Oldest first",
-  salary_high: "Pay: high to low",
-  salary_low: "Pay: low to high",
-  company: "Company A–Z",
-};
-
-const PAGE_SIZE = 24;
 
 export default async function Postings({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
-  const offset = Number(params.offset ?? 0) || 0;
 
   const [page, roleMix, stats] = await Promise.all([
-    getPostings({ ...params, limit: PAGE_SIZE, offset }),
+    getPostings(params),
     getRoleMix(),
     getStats(),
   ]);
+
+  // The API echoes the offset it actually used, which is the normalised one. Paging off the
+  // raw query string instead would label the page wrong whenever someone hand-edits the URL.
+  const offset = page.offset;
 
   const filters = { ...params, offset: undefined };
   const anyFilter = Object.entries(filters).some(([key, value]) => value && key !== "sort");

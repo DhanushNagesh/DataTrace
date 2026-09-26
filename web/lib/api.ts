@@ -2,6 +2,11 @@
 // The browser never learns the API Gateway URL, so the API needs no CORS configuration
 // and the throttle sees Vercel's regional IPs rather than every visitor's.
 
+import {
+  MAX_OFFSET, MAX_TEXT_LEN, MIN_SALARY, PAGE_SIZE, ROLE_FAMILIES, SENIORITIES, SORTS, SOURCES,
+  WORK_MODES,
+} from "@/lib/facets";
+
 const BASE = process.env.DATATRACE_API_URL;
 
 // The pipeline rebuilds the marts once a day; 5 minutes matches the cache-control the
@@ -120,19 +125,38 @@ export type PostingsQuery = {
   source?: string;
   min_salary?: string;
   sort?: string;
-  limit?: number;
-  offset?: number;
+  offset?: string;
 };
 
-// Only these keys are forwarded. Anything else in the URL (a stray utm tag, a hand-typed param)
-// is dropped rather than passed through to the API, which would 400 or split the Vercel cache.
-const POSTING_PARAMS = [
-  "q", "company", "role_family", "seniority", "work_mode", "source", "min_salary", "sort",
-  "limit", "offset",
-] as const;
+// Only these values are forwarded. The API validates its own input, but a request that reaches
+// it at all has already cost a Lambda invocation and a query against RDS, and has already taken
+// its own slot in Vercel's data cache. Anything the page could not have produced is dropped
+// here instead, so a crawler walking made-up query strings gets the same cached page as
+// everyone else rather than a private trip to the database.
+const oneOf = (value: string | undefined, allowed: readonly string[]) =>
+  value && allowed.includes(value) ? value : undefined;
 
-export const getPostings = (query: PostingsQuery) => {
-  const params: Record<string, string | number | undefined> = {};
-  for (const key of POSTING_PARAMS) params[key] = query[key];
-  return get<PostingsPage>("/postings", params);
+const text = (value: string | undefined) => value?.trim().slice(0, MAX_TEXT_LEN) || undefined;
+
+// Offsets only ever come from our own paging links, so they are always a multiple of the page
+// size. Snapping turns the 10,000 offsets the API accepts into the ~400 that can actually be
+// reached, which is the difference between a bounded set of cache entries and an unbounded one.
+const page = (value: string | undefined) => {
+  const offset = Math.floor(Number(value ?? 0));
+  if (!Number.isFinite(offset) || offset <= 0) return 0;
+  return Math.min(offset - (offset % PAGE_SIZE), MAX_OFFSET);
 };
+
+export const getPostings = (query: PostingsQuery) =>
+  get<PostingsPage>("/postings", {
+    q: text(query.q),
+    company: text(query.company),
+    role_family: oneOf(query.role_family, ROLE_FAMILIES),
+    seniority: oneOf(query.seniority, SENIORITIES),
+    work_mode: oneOf(query.work_mode, WORK_MODES),
+    source: oneOf(query.source, SOURCES),
+    min_salary: oneOf(query.min_salary, MIN_SALARY),
+    sort: oneOf(query.sort, Object.keys(SORTS)),
+    limit: PAGE_SIZE,
+    offset: page(query.offset),
+  });
