@@ -212,7 +212,7 @@ USD one.
 
 ## AWS setup
 
-I'm on the new AWS free plan, so everything is in a separate project account (264350941264)
+I'm on the new AWS free plan, so everything is in a separate project account
 that I log into with a login session instead of IAM user keys. An AWS managed SCP only allows
 **us-east-2**, so things like Lambda, Scheduler, RDS and S3 bucket creation are blocked in
 every other region.
@@ -246,7 +246,7 @@ python3.13 arm64 with 512 MB and a 5 minute timeout. A full run takes around 3.5
 mostly because of the ~2,000 SmartRecruiters detail requests.
 
 ```
-uv run datatrace-ingest --out s3://datatrace-raw-264350941264-us-east-2/raw
+uv run datatrace-ingest --out s3://datatrace-raw-<account-id>-us-east-2/raw
 infra/build_lambda.sh
 aws lambda update-function-code --function-name datatrace-ingest --zip-file fileb://dist/ingest.zip
 ```
@@ -472,7 +472,7 @@ always count as open since its feed can't tell when a job closes.
 RDS is the only real cost, at about **$14/month**, plus around $0.25/month for ECR storage.
 Everything else (Lambda, Step Functions, EventBridge, S3, Parameter Store, the four
 CloudWatch alarms, API Gateway at this amount of traffic, and Vercel Hobby) stays in the free
-tier. `infra/budget.sh [email] [limit]` sets up a monthly budget (default $25) with email
+tier. `infra/budget.sh <email> [limit]` sets up a monthly budget (default $25) with email
 alerts, and the first two AWS Budgets are free.
 
 Things I did on purpose to keep costs low:
