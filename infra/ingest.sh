@@ -27,6 +27,10 @@ ENV="Variables={DATATRACE_OUT=s3://datatrace-raw-${ACCOUNT_ID}-${AWS_REGION}/raw
 infra/build_lambda.sh ingest >/dev/null
 
 role_arn=$(ensure_role "$ROLE" infra/iam_ingest_policy.json)
+# ensure_role only attaches the managed logs policy to a role it creates, and this role predates
+# it, so the function's own log group is granted here
+aws iam put-role-policy --role-name "$ROLE" --policy-name logs \
+  --policy-document file://infra/iam_lambda_logs_policy.json
 
 if aws lambda get-function --function-name "$FUNCTION" >/dev/null 2>&1; then
   aws lambda update-function-code --function-name "$FUNCTION" --zip-file "fileb://$ZIP" >/dev/null

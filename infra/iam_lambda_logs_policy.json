@@ -6,8 +6,8 @@
       "Effect": "Allow",
       "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
       "Resource": [
-        "arn:aws:logs:REGION:ACCOUNT:log-group:/aws/lambda/datatrace-ingest",
-        "arn:aws:logs:REGION:ACCOUNT:log-group:/aws/lambda/datatrace-ingest:*"
+        "arn:aws:logs:*:*:log-group:/aws/lambda/datatrace-ingest",
+        "arn:aws:logs:*:*:log-group:/aws/lambda/datatrace-ingest:*"
       ]
     }
   ]
