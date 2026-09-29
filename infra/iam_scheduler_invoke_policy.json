@@ -5,7 +5,7 @@
       "Sid": "InvokeIngestOnly",
       "Effect": "Allow",
       "Action": "lambda:InvokeFunction",
-      "Resource": "arn:aws:lambda:us-east-2:264350941264:function:datatrace-ingest"
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:datatrace-ingest"
     }
   ]
 }

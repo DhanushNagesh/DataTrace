@@ -5,7 +5,7 @@
       "Effect": "Allow",
       "Principal": {"Service": "scheduler.amazonaws.com"},
       "Action": "sts:AssumeRole",
-      "Condition": {"StringEquals": {"aws:SourceAccount": "264350941264"}}
+      "Condition": {"StringEquals": {"aws:SourceAccount": "ACCOUNT"}}
     }
   ]
 }
