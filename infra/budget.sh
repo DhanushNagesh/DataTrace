@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Monthly cost budget with email alerts. Safe to re-run. AWS Budgets is free for the first two.
-# Usage: infra/budget.sh [email] [monthly-limit-usd]
+# Usage: infra/budget.sh <email> [monthly-limit-usd]
 set -euo pipefail
 
-EMAIL="${1:-dhnagesh@ucdavis.edu}"
+EMAIL="${1:?usage: infra/budget.sh <email> [monthly-limit-usd]}"
 LIMIT="${2:-25}"
 NAME=datatrace-monthly
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
