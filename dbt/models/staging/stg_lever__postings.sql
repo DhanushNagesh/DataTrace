@@ -23,7 +23,8 @@ parsed as (
         payload->>'hostedUrl' as url,
         payload->>'description' as description_html,
         to_timestamp((payload->>'createdAt')::bigint / 1000.0) as created_at,
-        ingested_at as observed_at
+        ingested_at as observed_at,
+        loaded_at
     from src
 )
 
@@ -60,7 +61,8 @@ select
         when created_at::time <> '00:00:00' then created_at
     end as published_at,
     null::timestamptz as source_updated_at,
-    observed_at
+    observed_at,
+    loaded_at
 from parsed
 left join {{ ref('board_companies') }} as companies
     on companies.source = 'lever' and companies.board = parsed.board

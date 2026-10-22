@@ -23,7 +23,8 @@ parsed as (
             payload->'jobAd'->'sections'->'additionalInformation'->>'text'
         ) as description_html,
         (payload->>'releasedDate')::timestamptz as published_at,
-        ingested_at as observed_at
+        ingested_at as observed_at,
+        loaded_at
     from src
 )
 
@@ -48,5 +49,6 @@ select
     description_html,
     published_at,
     null::timestamptz as source_updated_at,
-    observed_at
+    observed_at,
+    loaded_at
 from parsed

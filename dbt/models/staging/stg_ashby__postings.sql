@@ -37,7 +37,8 @@ parsed as (
         payload->>'jobUrl' as url,
         payload->>'descriptionHtml' as description_html,
         (payload->>'publishedAt')::timestamptz as published_at,
-        ingested_at as observed_at
+        ingested_at as observed_at,
+        loaded_at
     from src
     where coalesce((payload->>'isListed')::boolean, true)
 )
@@ -65,7 +66,8 @@ select
     description_html,
     published_at,
     null::timestamptz as source_updated_at,
-    observed_at
+    observed_at,
+    loaded_at
 from parsed
 left join {{ ref('board_companies') }} as companies
     on companies.source = 'ashby' and companies.board = parsed.board

@@ -23,7 +23,8 @@ parsed as (
         payload->>'content' as description_html,
         (payload->>'first_published')::timestamptz as published_at,
         (payload->>'updated_at')::timestamptz as source_updated_at,
-        ingested_at as observed_at
+        ingested_at as observed_at,
+        loaded_at
     from src
 )
 
@@ -54,5 +55,6 @@ select
     description_html,
     published_at,
     source_updated_at,
-    observed_at
+    observed_at,
+    loaded_at
 from parsed

@@ -32,6 +32,9 @@ create table if not exists raw.job_postings (
     loaded_at timestamptz not null default now(),
     primary key (object_key, line_no)
 );
+
+-- dbt's incremental models pick up new rows by loaded_at
+create index if not exists job_postings_loaded_at on raw.job_postings (loaded_at);
 """
 
 
