@@ -30,7 +30,7 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {"FunctionName": "datatrace-dbt", "Payload": {}},
       "TimeoutSeconds": 1200,
-      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 60, "MaxAttempts": 1, "BackoffRate": 2}],
+      "Retry": [{"ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 60, "MaxAttempts": 1, "BackoffRate": 2}],
       "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "Notify"}],
       "ResultSelector": {"counts.$": "$.Payload.counts"},
       "ResultPath": "$.dbt",
