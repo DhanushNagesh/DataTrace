@@ -34,6 +34,13 @@ vars:
   # keeps showing it. See is_stale in fct_job_postings.
   stale_after_days: 365
 
+data_tests:
+  datatrace:
+    staging:
+      # Staging views re-parse all of raw.job_postings, which grows by a full run every day.
+      # Testing only recent observations keeps test time flat; older rows were tested on their day.
+      +where: "observed_at >= current_date - 2"
+
 seeds:
   datatrace:
     +schema: seeds
