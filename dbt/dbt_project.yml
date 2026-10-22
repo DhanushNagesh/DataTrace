@@ -40,8 +40,9 @@ data_tests:
   datatrace:
     staging:
       # Staging views re-parse all of raw.job_postings, which grows by a full run every day.
-      # Testing only recent observations keeps test time flat; older rows were tested on their day.
-      +where: "observed_at >= current_date - 2"
+      # Testing only rows loaded recently keeps test time flat; older rows were tested on their
+      # day. loaded_at, not observed_at, because raw is indexed on it, so this is an index scan.
+      +where: "loaded_at >= current_date - 2"
 
 seeds:
   datatrace:
