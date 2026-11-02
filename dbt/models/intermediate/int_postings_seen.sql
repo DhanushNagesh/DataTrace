@@ -8,6 +8,8 @@
 --
 -- Changing a staging macro (is_us_location, say) only affects rows loaded afterwards.
 -- Reclassify history with: dbt build --full-refresh --select int_postings_seen+
+-- In prod that no longer fits in one Lambda invoke; infra/backfill.sh splits it into chunks
+-- using the backfill_until var, which caps loaded_at for one run.
 
 {% set cols = [
     'source', 'board', 'posting_id', 'company', 'title', 'location', 'department',
@@ -17,8 +19,12 @@
 
 with new_obs as (
     select * from {{ ref('stg_job_postings') }}
+    where true
     {% if is_incremental() %}
-    where loaded_at > (select max(loaded_at) from {{ this }})
+        and loaded_at > (select coalesce(max(loaded_at), '-infinity') from {{ this }})
+    {% endif %}
+    {% if var('backfill_until', none) %}
+        and loaded_at <= '{{ var("backfill_until") }}'::timestamptz
     {% endif %}
 ),
 
