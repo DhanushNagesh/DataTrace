@@ -1,4 +1,4 @@
--- Reports what api_reader can actually do. Read-only; run through the migrations Lambda:
+-- Reports what the warehouse roles can do, including their login settings (session_settings). Read-only; run through the migrations Lambda:
 --   infra/db_admin.sh '{"scripts":["check_roles.sql"]}'
 select
     r.rolname,

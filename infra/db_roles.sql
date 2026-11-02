@@ -34,3 +34,10 @@ begin
     execute format('grant create on database %I to datatrace_pipeline', current_database());
 end
 $$;
+
+-- When the dbt Lambda hits its 900s limit, its queries keep running in Postgres with nobody
+-- waiting for them; on Oct 22 2026 that wedged the instance for hours. This makes Postgres cancel
+-- them itself. Since dbt went incremental the slowest node is ~25s and the slowest whole loader
+-- run ~130s, so 300s leaves room to grow while capping how long an orphan can run.
+-- A deliberate full refresh needs more: run `set statement_timeout = 0` in that session first.
+alter role datatrace_pipeline set statement_timeout = '300s';
