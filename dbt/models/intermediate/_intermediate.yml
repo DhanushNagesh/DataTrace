@@ -1,0 +1,12 @@
+version: 2
+
+models:
+  - name: int_postings_seen
+    description: One row per US-accessible posting with its latest attributes, built incrementally from stg_job_postings.
+    columns:
+      - name: posting_key
+        data_tests: [unique, not_null]
+      - name: first_seen_at
+        data_tests: [not_null]
+      - name: last_seen_at
+        data_tests: [not_null]

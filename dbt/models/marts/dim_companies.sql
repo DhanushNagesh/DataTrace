@@ -4,7 +4,7 @@ select
     {{ company_key('company') }} as company_key,
     mode() within group (order by company) as company_name,
     string_agg(distinct source, ', ' order by source) as sources,
-    min(observed_at) as first_seen_at
-from {{ ref('stg_job_postings') }}
-where company is not null
+    min(first_seen_at) as first_seen_at
+from {{ ref('int_postings_seen') }}
+where company is not null and {{ not_retired_board() }}
 group by 1

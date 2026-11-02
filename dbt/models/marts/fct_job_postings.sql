@@ -1,22 +1,8 @@
 -- One row per US-accessible posting: latest attributes plus when the pipeline first and last saw it
-with observations as (
-    select * from {{ ref('stg_job_postings') }}
-),
-
-latest as (
-    select distinct on (posting_key) *
-    from observations
-    order by posting_key, observed_at desc
-),
-
-seen as (
-    select
-        posting_key,
-        min(observed_at) as first_seen_at,
-        max(observed_at) as last_seen_at,
-        count(*) as times_seen
-    from observations
-    group by posting_key
+with postings as (
+    -- int_postings_seen is incremental, so it keeps rows from boards retired after they landed
+    select * from {{ ref('int_postings_seen') }}
+    where {{ not_retired_board() }}
 ),
 
 board_latest as (
@@ -27,43 +13,42 @@ board_latest as (
 
 assembled as (
 select
-    latest.posting_key,
-    {{ company_key('latest.company') }} as company_key,
-    latest.source,
-    latest.board,
-    latest.posting_id,
-    latest.title,
-    {{ role_family('latest.title', 'latest.department') }} as role_family,
-    {{ seniority('latest.title') }} as seniority,
-    latest.location,
-    latest.department,
-    latest.employment_type,
-    latest.is_remote,
-    latest.is_us,
-    latest.is_remote_anywhere,
-    latest.salary_min,
-    latest.salary_max,
-    latest.salary_currency,
-    latest.salary_interval,
-    latest.url,
-    latest.published_at,
-    seen.first_seen_at,
-    seen.last_seen_at,
-    seen.times_seen,
+    p.posting_key,
+    {{ company_key('p.company') }} as company_key,
+    p.source,
+    p.board,
+    p.posting_id,
+    p.title,
+    {{ role_family('p.title', 'p.department') }} as role_family,
+    {{ seniority('p.title') }} as seniority,
+    p.location,
+    p.department,
+    p.employment_type,
+    p.is_remote,
+    p.is_us,
+    p.is_remote_anywhere,
+    p.salary_min,
+    p.salary_max,
+    p.salary_currency,
+    p.salary_interval,
+    p.url,
+    p.published_at,
+    p.first_seen_at,
+    p.last_seen_at,
+    p.times_seen,
     -- Active means present in the board's latest run, so a board outage doesn't close its postings.
     -- RemoteOK's feed only holds its newest ~100 jobs, so dropping out of it says nothing about closing.
     case
-        when latest.source = 'remoteok' then null
-        else seen.last_seen_at = board_latest.latest_run_at
+        when p.source = 'remoteok' then null
+        else p.last_seen_at = board_latest.latest_run_at
     end as is_active,
     -- published_at predates the pipeline, so this isn't capped at how long ingestion has been running
-    extract(epoch from seen.last_seen_at - coalesce(latest.published_at, seen.first_seen_at)) / 86400
+    extract(epoch from p.last_seen_at - coalesce(p.published_at, p.first_seen_at)) / 86400
         as days_listed
-from latest
-join seen using (posting_key)
+from postings p
 join board_latest
-    on board_latest.source = latest.source
-    and board_latest.board is not distinct from latest.board
+    on board_latest.source = p.source
+    and board_latest.board is not distinct from p.board
 )
 
 select

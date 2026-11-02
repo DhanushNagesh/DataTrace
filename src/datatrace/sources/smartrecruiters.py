@@ -15,6 +15,9 @@ def fetch(session, board: str) -> Iterator[dict]:
         offset += PAGE_SIZE
         if not page["content"] or offset >= page["totalFound"]:
             break
+    # Offset paging over a live list: a posting added mid-run shifts every later page by one,
+    # so the last posting of one page comes back as the first of the next
+    ids = dict.fromkeys(p["id"] for p in postings)
     # The list omits the job ad text, so each posting needs its own detail request
-    details = get_many(session, [f"{url}/{p['id']}" for p in postings])
+    details = get_many(session, [f"{url}/{i}" for i in ids])
     yield from (d for d in details if d is not None)

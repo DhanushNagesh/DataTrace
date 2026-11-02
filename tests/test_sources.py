@@ -49,6 +49,22 @@ def test_smartrecruiters_pages_then_fetches_details(monkeypatch):
     assert details[0]["url"].endswith("/companies/Acme/postings/0")
 
 
+def test_smartrecruiters_drops_posting_repeated_across_pages(monkeypatch):
+    # A posting added after page one pushes posting 99 onto page two as well
+    pages = {
+        0: {"content": [{"id": i} for i in range(100)], "totalFound": 102},
+        100: {"content": [{"id": 99}, {"id": 100}], "totalFound": 102},
+    }
+    monkeypatch.setattr(
+        smartrecruiters, "get_json", lambda s, url, params: pages[params["offset"]]
+    )
+    monkeypatch.setattr(
+        smartrecruiters, "get_many", lambda s, urls: ({"url": u} for u in urls)
+    )
+    urls = [d["url"] for d in smartrecruiters.fetch(None, "Acme")]
+    assert len(urls) == len(set(urls)) == 101
+
+
 def test_rippling_merges_per_location_items(monkeypatch):
     items = [
         {"id": "j1", "locations": [{"name": "NYC"}]},

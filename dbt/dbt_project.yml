@@ -19,6 +19,8 @@ models:
     staging:
       +schema: staging
       +materialized: view
+    intermediate:
+      +schema: intermediate
     marts:
       +schema: marts
       +materialized: table
@@ -33,6 +35,14 @@ vars:
   # Days after its publish date that a posting stops counting as open, however long the board
   # keeps showing it. See is_stale in fct_job_postings.
   stale_after_days: 365
+
+data_tests:
+  datatrace:
+    staging:
+      # Staging views re-parse all of raw.job_postings, which grows by a full run every day.
+      # Testing only rows loaded recently keeps test time flat; older rows were tested on their
+      # day. loaded_at, not observed_at, because raw is indexed on it, so this is an index scan.
+      +where: "loaded_at >= current_date - 2"
 
 seeds:
   datatrace:
