@@ -232,6 +232,7 @@ Every script in `infra/` is safe to run more than once.
 | `build_lambda.sh` | builds the ingest zip |
 | `loader.sh` | builds, deploys and runs the loader |
 | `dbt.sh` | builds the image, pushes to ECR, runs `dbt build` on prod |
+| `backfill.sh dates...` | rebuilds posting history from all of raw in several dbt invokes |
 | `api.sh [origin]` | API Lambda and the Gateway routes |
 | `pipeline.sh` | the Step Functions state machine, and points the schedule at it |
 | `db_admin.sh` | runs a bundled SQL script inside the VPC |
@@ -282,6 +283,18 @@ as the owner of every table.
 ```
 infra/dbt.sh                          # dbt build against prod
 infra/dbt.sh '{"command":["test"]}'
+```
+
+`int_postings_seen` only parses newly loaded rows, so a change to a staging macro such as
+`is_us_location` needs a full refresh to reach history. That no longer fits in one 900s invoke
+(805s on Oct 22 with ~35 days of raw). `infra/backfill.sh` splits it by `loaded_at`: the first
+chunk recreates the table up to a date, later chunks merge in the next range, and a normal build
+finishes the rest and rebuilds the marts. A 2 GB Lambda costs ~3 cents for the whole thing, so
+Fargate wasn't worth it: it would need ECR and Logs endpoints or a NAT in the private subnets.
+
+```
+infra/dbt.sh '{"command":["parse"]}'                  # deploy without building
+infra/backfill.sh 2026-09-27 2026-10-07 2026-10-17 2026-10-27
 ```
 
 Getting dbt to run in Lambda took some work. These are all handled in `dbt_handler`:
