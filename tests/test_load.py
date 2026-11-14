@@ -44,6 +44,12 @@ def test_unicode_line_separator_stays_in_one_record(conn, tmp_path):
     assert row[0] == "a b"
 
 
+def test_empty_board_loads_as_zero_records(conn, tmp_path):
+    write_run(tmp_path, "080000", [])
+    assert load.load(conn, load.LocalStore(tmp_path)) == {"runs": 1, "records": 0}
+    assert conn.execute("select records from raw.loaded_runs").fetchone()[0] == 0
+
+
 def test_bad_record_rolls_back_whole_run(conn, tmp_path):
     write_run(tmp_path, "080000", [{"id": 1}])
     obj = next(tmp_path.rglob("*.jsonl"))
