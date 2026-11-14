@@ -84,8 +84,13 @@ def make_store(src: str) -> LocalStore | S3Store:
 
 def _rows(store, objects: list[str]):
     for obj in objects:
+        data = store.read(obj)
+        # A board with no open postings is written as an empty object; a blank line inside a
+        # non-empty object is still corruption and fails below
+        if not data:
+            continue
         # Not splitlines(): it also breaks on U+2028 etc., which ensure_ascii=False leaves raw in descriptions
-        lines = store.read(obj).decode("utf-8").rstrip("\n").split("\n")
+        lines = data.decode("utf-8").rstrip("\n").split("\n")
         for line_no, line in enumerate(lines, 1):
             rec = json.loads(line)
             yield (
